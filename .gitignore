@@ -1,0 +1,9 @@
+# census data files are too big for GitHub (>100 MB each)
+*.csv
+data/*.csv
+
+# local environment / OS / Python cache files
+.venv/
+.idea/
+.DS_Store
+__pycache__/
