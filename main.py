@@ -1,5 +1,7 @@
 # Main Python File: main.py
-# The purpose of this file is to run all of the stages of this experiment
+# The purpose of this file is to run all phases of the experiment
+# including data preparation, model training, and model testing. It also compares the performance of
+# different models for each disability type.
 
 from pathlib import Path
 
