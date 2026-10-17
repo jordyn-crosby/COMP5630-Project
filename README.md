@@ -30,12 +30,12 @@ them in a `data/` folder as `nov19pub.csv`, `nov21pub.csv`, and `nov23pub.csv`.
 
 ## Running dataPrep.py
 ```
-python dataPrep.py                    # builds data/combined_data.csv and data/predictor_data.csv
+python dataPrep.py                    # builds data/combined_data.csv, data/filtered_data.csv and data/predictor_data.csv
 python -m unittest test_dataPrep -v   # runs the unit tests
 ```
 
 ## Running main.py
 ```
-python main.py                        # runs the main application
+python main.py                        # trains/tests models for each disability type (runs dataPrep first if data/predictor_data.csv is missing)
 python -m unittest test_main -v       # runs the unit tests
 ```

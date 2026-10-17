@@ -13,16 +13,6 @@
 
 import glob
 import pandas as pd
-import numpy as np
-
-try:
-    from sklearn.model_selection import train_test_split
-    from sklearn.preprocessing import StandardScaler
-    from sklearn.linear_model import LogisticRegression
-except ModuleNotFoundError:
-    train_test_split = None
-    StandardScaler = None
-    LogisticRegression = None
 
 # columns whose names differ between survey years, mapped to a common name
 # (2019 stores state FIPS as GCFIP; 2021 and 2023 use GESTFIPS)
@@ -73,7 +63,8 @@ def feature_selection(df):
     # (split back into indicators with df["DISTYPE"].str.get_dummies("|"))
     names = pd.Series([name + "|" for name, _ in disability_map.values()], index=indicator_columns)
     df["DISTYPE"] = df[indicator_columns].astype(bool).dot(names).str.rstrip("|").replace("", "None")
-    df.to_csv("data/combined_data.csv", index=False)
+    # filtered rows with every column kept (separate file so the raw combined_data.csv is not overwritten)
+    df.to_csv("data/filtered_data.csv", index=False)
 
     predictor_variables = [
         "PRTAGE",    # age

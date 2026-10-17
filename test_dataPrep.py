@@ -216,14 +216,14 @@ class TestFeatureSelection(TempDirTestCase):
         self.assertEqual(result["DIS_HEARING"].tolist(), [1])
         self.assertEqual(result["DIS_VISION"].tolist(), [0])
 
-    def test_writes_combined_and_predictor_csvs(self):
+    def test_writes_filtered_and_predictor_csvs(self):
         df = pd.DataFrame([make_row(PEDISEAR=1)])
 
         result = dataPrep.feature_selection(df)
 
-        combined = pd.read_csv("data/combined_data.csv")
-        self.assertIn("DISTYPE", combined.columns)
-        self.assertIn("HRHHID", combined.columns)  # combined keeps all columns
+        filtered = pd.read_csv("data/filtered_data.csv")
+        self.assertIn("DISTYPE", filtered.columns)
+        self.assertIn("HRHHID", filtered.columns)  # filtered keeps all columns
 
         predictor = pd.read_csv("data/predictor_data.csv")
         self.assertEqual(set(predictor.columns), set(result.columns))
@@ -259,7 +259,7 @@ class TestMain(TempDirTestCase):
             second = dataPrep.main()
 
         pd.testing.assert_frame_equal(first, second)
-        self.assertEqual(len(pd.read_csv("data/combined_data.csv")), 2)
+        self.assertEqual(len(pd.read_csv("data/filtered_data.csv")), 2)
 
     def test_end_to_end_filters_and_selects_features(self):
         pd.DataFrame([
@@ -278,7 +278,9 @@ class TestMain(TempDirTestCase):
         self.assertEqual(result["DISTYPE"].tolist(), ["Vision", "Physical"])
         self.assertNotIn("PRDISFLG", result.columns)
         self.assertTrue(os.path.exists("data/combined_data.csv"))
+        self.assertTrue(os.path.exists("data/filtered_data.csv"))
         self.assertTrue(os.path.exists("data/predictor_data.csv"))
+        self.assertEqual(len(pd.read_csv("data/combined_data.csv")), 4)  # raw rows, not overwritten
 
 
 if __name__ == "__main__":
