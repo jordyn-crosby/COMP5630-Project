@@ -35,7 +35,17 @@ python -m unittest test_dataPrep -v   # runs the unit tests
 ```
 
 ## Running main.py
+Requires `matplotlib` for the charts (`pip install matplotlib`).
 ```
-python main.py                        # trains/tests models for each disability type (runs dataPrep first if data/predictor_data.csv is missing)
+python main.py                        # predicts digital exclusion: random split, 2019+2021 -> 2023 check, feature importance, reduced model
 python -m unittest test_main -v       # runs the unit tests
+```
+`main.py` writes `results/model_performance.csv` (accuracy, macro F1, ROC AUC and predicted-vs-actual
+counts for every model in every experiment) and draws `results/model_performance.png` and
+`results/confusion_matrix.png` from it.
+
+## Redrawing the charts
+```
+python plot_results.py                # rebuilds the charts from results/model_performance.csv, no retraining
+python -m unittest test_plot_results -v
 ```

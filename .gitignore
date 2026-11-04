@@ -7,3 +7,6 @@ data/*.csv
 .idea/
 .DS_Store
 __pycache__/
+
+# small model performance table written by main.py (kept so it can go with the paper)
+!results/*.csv

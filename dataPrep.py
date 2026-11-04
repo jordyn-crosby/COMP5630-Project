@@ -7,9 +7,10 @@
 # Combine data into one large CSV file
 # Filter data based on age and disability flag
 
-# Phase 2: Feature Selection
-# Select predictor variables and target variable (disability type)
-# Exclude direct internet access and technology ownership characteristics
+# Phase 2: Target Setup and Feature Selection
+# Target: DIG_EXCLUDED, a binary digital exclusion flag built from the personal internet use questions
+# Predictors: ten intake-style characteristics, including disability type
+# Internet access and technology ownership columns are used only to build the target, never as predictors
 
 import glob
 import pandas as pd
@@ -26,6 +27,19 @@ def concat_csv_files(file_list, output_file):
     df = pd.concat(df_list, ignore_index=True)
     df.to_csv(output_file, index=False)
 
+# personal internet use by location (1 = yes, 2 = no, -1 = not in universe)
+INTERNET_USE_COLUMNS = [
+    "PEINHOME",  # at home
+    "PEINWORK",  # at work
+    "PEINSCHL",  # at school
+    "PEINCAFE",  # coffee shop or other business
+    "PEINLICO",  # library or community center
+    "PEINELHO",  # someone else's home
+    "PEINOTHR",  # other location
+]
+
+TARGET_COLUMN = "DIG_EXCLUDED"
+
 # load data from a CSV file into a DataFrame
 def load_data(file_path):
     return pd.read_csv(file_path)
@@ -36,6 +50,17 @@ def filter_data(df, filter_list):
     for condition in filter_list:
         mask &= condition
     return df[mask].copy()
+
+
+# digital exclusion target: 1 when the person does not use the internet at any location
+# (a missing column counts as "not used", matching how missing disability flags are handled)
+def build_exclusion_target(df):
+    uses_internet = pd.Series(False, index=df.index)
+    for col in INTERNET_USE_COLUMNS:
+        if col in df.columns:
+            uses_internet |= df[col] == 1
+    df[TARGET_COLUMN] = (~uses_internet).astype(int)
+    return df
 
 
 def feature_selection(df):
@@ -50,7 +75,7 @@ def feature_selection(df):
     }
 
     # one 0/1 column per disability type (1 = census flag is 1 = "yes");
-    # a person can have several, so these are the multi-label targets
+    # a person can have several, so these indicators together make up the disability type predictor
     indicator_columns = []
     for flag_col, (name, indicator_col) in disability_map.items():
         if flag_col in df.columns:
@@ -63,6 +88,8 @@ def feature_selection(df):
     # (split back into indicators with df["DISTYPE"].str.get_dummies("|"))
     names = pd.Series([name + "|" for name, _ in disability_map.values()], index=indicator_columns)
     df["DISTYPE"] = df[indicator_columns].astype(bool).dot(names).str.rstrip("|").replace("", "None")
+    df = build_exclusion_target(df)
+
     # filtered rows with every column kept (separate file so the raw combined_data.csv is not overwritten)
     df.to_csv("data/filtered_data.csv", index=False)
 
@@ -76,7 +103,9 @@ def feature_selection(df):
         "HETENURE",  # housing tenure
         "GESTFIPS",  # state
         "PEMLR",     # employment status
-        "DISTYPE"
+        "DISTYPE",
+        "HRYEAR4",   # survey year: not a predictor, used for the train-on-earlier/test-on-2023 check
+        TARGET_COLUMN,
     ] + indicator_columns
 
     columns_to_drop = [col for col in df.columns if col not in predictor_variables]
@@ -104,7 +133,7 @@ def main():
     # RESULTANT OF PHASE 1: filtering based on age and disability flag
     df = filter_data(df, [df['PRTAGE'] >= 65,df['PRDISFLG'] == 1 ])
 
-    # RESULTANT OF PHASE 2: feature selection based on predictor variables and target variable (disability type)
+    # RESULTANT OF PHASE 2: target setup (digital exclusion) and feature selection (predictors incl. disability type)
     df = feature_selection(df)
 
     return df

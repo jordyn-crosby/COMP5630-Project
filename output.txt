@@ -1,0 +1,119 @@
+Population: 18762 adults 65+ with a disability; digitally excluded rate = 0.394
+
+===== Experiment: random 70/30 split, all ten predictors =====
+Logistic Regression: best params {'model__C': 0.01}, CV f1_macro=0.671, train accuracy=0.680
+Decision Tree: best params {'model__max_depth': 5, 'model__min_samples_leaf': 1}, CV f1_macro=0.656, train accuracy=0.667
+Random Forest: best params {'model__max_depth': None, 'model__min_samples_leaf': 5}, CV f1_macro=0.675, train accuracy=0.747
+XGBoost: best params {'model__learning_rate': 0.1, 'model__max_depth': 3, 'model__n_estimators': 100}, CV f1_macro=0.672, train accuracy=0.694
+ Model Training Complete
+ Model Testing Complete. Initiating Model Comparison...
+
+
+Model Comparison:
+Baseline (always connected): Accuracy=0.606, Balanced Acc=0.500, Macro F1=0.377, AUC=0.500
+Logistic Regression: Accuracy=0.675, Balanced Acc=0.675, Macro F1=0.668, AUC=0.733
+Decision Tree: Accuracy=0.662, Balanced Acc=0.670, Macro F1=0.658, AUC=0.716
+Random Forest: Accuracy=0.684, Balanced Acc=0.682, Macro F1=0.676, AUC=0.739
+XGBoost: Accuracy=0.684, Balanced Acc=0.686, Macro F1=0.678, AUC=0.740
+
+Best model: XGBoost with Macro F1=0.678
+              precision    recall  f1-score   support
+
+           0       0.77      0.68      0.72      3411
+           1       0.58      0.70      0.63      2218
+
+    accuracy                           0.68      5629
+   macro avg       0.68      0.69      0.68      5629
+weighted avg       0.70      0.68      0.69      5629
+
+Predicted vs actual (test set, n=5629):
+                         Predicted connected      Predicted excluded
+Actually connected            2307 (correct)      1104 (false alarm)
+Actually excluded               674 (missed)          1544 (correct)
+Overall accuracy: 3851 / 5629 = 0.684
+
+===== Experiment: train on [2019, 2021], test on 2023 =====
+Logistic Regression: best params {'model__C': 0.01}, CV f1_macro=0.676, train accuracy=0.683
+Decision Tree: best params {'model__max_depth': 5, 'model__min_samples_leaf': 20}, CV f1_macro=0.667, train accuracy=0.676
+Random Forest: best params {'model__max_depth': None, 'model__min_samples_leaf': 5}, CV f1_macro=0.680, train accuracy=0.746
+XGBoost: best params {'model__learning_rate': 0.1, 'model__max_depth': 3, 'model__n_estimators': 100}, CV f1_macro=0.680, train accuracy=0.698
+ Model Training Complete
+ Model Testing Complete. Initiating Model Comparison...
+
+
+Model Comparison:
+Baseline (always connected): Accuracy=0.667, Balanced Acc=0.500, Macro F1=0.400, AUC=0.500
+Logistic Regression: Accuracy=0.672, Balanced Acc=0.665, Macro F1=0.651, AUC=0.726
+Decision Tree: Accuracy=0.665, Balanced Acc=0.662, Macro F1=0.647, AUC=0.704
+Random Forest: Accuracy=0.673, Balanced Acc=0.668, Macro F1=0.653, AUC=0.726
+XGBoost: Accuracy=0.675, Balanced Acc=0.672, Macro F1=0.656, AUC=0.728
+
+Best model: XGBoost with Macro F1=0.656
+              precision    recall  f1-score   support
+
+           0       0.80      0.68      0.74      4178
+           1       0.51      0.66      0.58      2090
+
+    accuracy                           0.68      6268
+   macro avg       0.66      0.67      0.66      6268
+weighted avg       0.70      0.68      0.68      6268
+
+Predicted vs actual (test set, n=6268):
+                         Predicted connected      Predicted excluded
+Actually connected            2848 (correct)      1330 (false alarm)
+Actually excluded               706 (missed)          1384 (correct)
+Overall accuracy: 4232 / 6268 = 0.675
+
+===== Feature importance (normalized, grouped by predictor) =====
+                 Logistic Regression  Decision Tree  Random Forest  XGBoost   Mean
+PEEDUCA                        0.069          0.482          0.207    0.135  0.223
+GESTFIPS                       0.400          0.013          0.125    0.318  0.214
+DISABILITY_TYPE                0.146          0.090          0.147    0.201  0.146
+PRTAGE                         0.069          0.233          0.161    0.066  0.133
+HEFAMINC                       0.052          0.176          0.166    0.054  0.112
+PEMARITL                       0.052          0.000          0.072    0.062  0.047
+PEMLR                          0.074          0.006          0.044    0.058  0.046
+PTDTRACE                       0.097          0.000          0.028    0.056  0.045
+PESEX                          0.028          0.000          0.026    0.015  0.017
+HETENURE                       0.011          0.000          0.024    0.034  0.017
+
+===== Experiment: reduced model with top 4 predictors ['PEEDUCA', 'GESTFIPS', 'DISABILITY_TYPE', 'PRTAGE'] =====
+Logistic Regression: best params {'model__C': 0.01}, CV f1_macro=0.661, train accuracy=0.672
+Decision Tree: best params {'model__max_depth': 5, 'model__min_samples_leaf': 1}, CV f1_macro=0.656, train accuracy=0.680
+Random Forest: best params {'model__max_depth': 10, 'model__min_samples_leaf': 1}, CV f1_macro=0.665, train accuracy=0.717
+XGBoost: best params {'model__learning_rate': 0.05, 'model__max_depth': 3, 'model__n_estimators': 100}, CV f1_macro=0.663, train accuracy=0.679
+ Model Training Complete
+ Model Testing Complete. Initiating Model Comparison...
+
+
+Model Comparison:
+Baseline (always connected): Accuracy=0.606, Balanced Acc=0.500, Macro F1=0.377, AUC=0.500
+Logistic Regression: Accuracy=0.663, Balanced Acc=0.659, Macro F1=0.654, AUC=0.710
+Decision Tree: Accuracy=0.669, Balanced Acc=0.652, Macro F1=0.652, AUC=0.700
+Random Forest: Accuracy=0.675, Balanced Acc=0.669, Macro F1=0.665, AUC=0.717
+XGBoost: Accuracy=0.668, Balanced Acc=0.668, Macro F1=0.661, AUC=0.718
+
+Best model: Random Forest with Macro F1=0.665
+              precision    recall  f1-score   support
+
+           0       0.75      0.70      0.72      3411
+           1       0.58      0.64      0.61      2218
+
+    accuracy                           0.67      5629
+   macro avg       0.66      0.67      0.67      5629
+weighted avg       0.68      0.67      0.68      5629
+
+Predicted vs actual (test set, n=5629):
+                         Predicted connected      Predicted excluded
+Actually connected            2372 (correct)      1039 (false alarm)
+Actually excluded               793 (missed)          1425 (correct)
+Overall accuracy: 3797 / 5629 = 0.675
+
+===== Summary: best model per experiment =====
+                Experiment    Best Model  Macro F1  Balanced Accuracy  Recall  ROC AUC
+              Random split       XGBoost     0.678              0.686   0.696    0.740
+Train 2019+2021, test 2023       XGBoost     0.656              0.672   0.662    0.728
+    Reduced (4 predictors) Random Forest     0.665              0.669   0.642    0.717
+
+Saved model performance table to results/model_performance.csv
+Saved charts to results/model_performance.png and results/confusion_matrix.png

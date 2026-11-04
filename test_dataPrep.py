@@ -149,6 +149,31 @@ INDICATOR_COLUMNS = {"DIS_HEARING", "DIS_VISION", "DIS_COGNITIVE",
                      "DIS_PHYSICAL", "DIS_SELFCARE", "DIS_INDLIVING"}
 
 
+class TestBuildExclusionTarget(unittest.TestCase):
+
+    def target_for(self, **uses):
+        row = {col: 2 for col in dataPrep.INTERNET_USE_COLUMNS}
+        row.update(uses)
+        return dataPrep.build_exclusion_target(pd.DataFrame([row]))["DIG_EXCLUDED"].item()
+
+    def test_home_use_is_not_excluded(self):
+        self.assertEqual(self.target_for(PEINHOME=1), 0)
+
+    def test_use_only_away_from_home_is_not_excluded(self):
+        self.assertEqual(self.target_for(PEINLICO=1), 0)
+        self.assertEqual(self.target_for(PEINWORK=1), 0)
+
+    def test_no_use_anywhere_is_excluded(self):
+        self.assertEqual(self.target_for(), 1)
+
+    def test_not_in_universe_counts_as_no_use(self):
+        self.assertEqual(self.target_for(PEINWORK=-1), 1)
+
+    def test_missing_columns_count_as_no_use(self):
+        df = dataPrep.build_exclusion_target(pd.DataFrame({"PRTAGE": [70]}))
+        self.assertEqual(df["DIG_EXCLUDED"].tolist(), [1])
+
+
 class TestFeatureSelection(TempDirTestCase):
 
     def test_maps_each_disability_flag_to_type(self):
@@ -206,13 +231,21 @@ class TestFeatureSelection(TempDirTestCase):
         self.assertEqual(
             set(result.columns),
             {"PRTAGE", "PESEX", "PTDTRACE", "PEMARITL", "HEFAMINC", "PEEDUCA",
-             "HETENURE", "GESTFIPS", "PEMLR", "DISTYPE"} | INDICATOR_COLUMNS,
+             "HETENURE", "GESTFIPS", "PEMLR", "DISTYPE", "DIG_EXCLUDED"} | INDICATOR_COLUMNS,
         )
+
+    def test_keeps_year_and_target_but_drops_internet_columns(self):
+        df = pd.DataFrame([make_row(HRYEAR4=2023, PEINHOME=1, HEINHOME=1, PEDESKTP=1)])
+        result = dataPrep.feature_selection(df)
+        self.assertEqual(result["HRYEAR4"].tolist(), [2023])
+        self.assertEqual(result["DIG_EXCLUDED"].tolist(), [0])
+        for col in ["PEINHOME", "HEINHOME", "PEDESKTP"]:
+            self.assertNotIn(col, result.columns)
 
     def test_missing_predictor_columns_are_not_added(self):
         df = pd.DataFrame({"PRTAGE": [70], "PEDISEAR": [1], "HRHHID": [1]})
         result = dataPrep.feature_selection(df)
-        self.assertEqual(set(result.columns), {"PRTAGE", "DISTYPE"} | INDICATOR_COLUMNS)
+        self.assertEqual(set(result.columns), {"PRTAGE", "DISTYPE", "DIG_EXCLUDED"} | INDICATOR_COLUMNS)
         self.assertEqual(result["DIS_HEARING"].tolist(), [1])
         self.assertEqual(result["DIS_VISION"].tolist(), [0])
 
