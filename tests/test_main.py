@@ -1,12 +1,13 @@
 # Title: test_main.py
 # Description: Unit tests for main.py.
-# Run with: python -m unittest test_main -v
+# Run with: python -m unittest tests.test_main -v
 #
 # Tests use a small synthetic DataFrame so they run quickly and never touch the real data/ folder.
 
 import os
 import tempfile
 import unittest
+from pathlib import Path
 from unittest import mock
 
 import numpy as np
@@ -181,6 +182,12 @@ class TestMain(unittest.TestCase):
         self._tmp = tempfile.TemporaryDirectory()
         os.chdir(self._tmp.name)
         os.makedirs("data")
+        tmp = Path(self._tmp.name)
+        for name, path in [("PREDICTOR_FILE", tmp / "data" / "predictor_data.csv"),
+                           ("RESULTS_FILE", tmp / "results" / "model_performance.csv")]:
+            patcher = mock.patch.object(main, name, path)
+            patcher.start()
+            self.addCleanup(patcher.stop)
 
     def tearDown(self):
         os.chdir(self._orig_cwd)
@@ -202,15 +209,4 @@ class TestMain(unittest.TestCase):
 
         table = pd.read_csv(main.RESULTS_FILE)
         self.assertEqual(len(table), 15)  # 3 experiments x (4 models + baseline)
-        self.assertTrue(os.path.getsize("results/model_performance.png") > 0)
-        self.assertTrue(os.path.getsize("results/confusion_matrix.png") > 0)
-
-    def test_stops_when_no_data_available(self):
-        with mock.patch("builtins.print"), \
-                mock.patch.object(main.dataPrep, "main", return_value=None) as prep:
-            self.assertIsNone(main.main())
-        prep.assert_called_once()
-
-
-if __name__ == "__main__":
-    unittest.main()
+        self.assertTrue(os.path.getsize("results/model_performan

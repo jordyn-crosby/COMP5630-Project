@@ -13,7 +13,13 @@
 # Internet access and technology ownership columns are used only to build the target, never as predictors
 
 import glob
+from pathlib import Path
+
 import pandas as pd
+
+# project folders, found from this file so the scripts work from any working directory
+PROJECT_ROOT = Path(__file__).resolve().parent.parent
+DATA_DIR = PROJECT_ROOT / "data"
 
 # columns whose names differ between survey years, mapped to a common name
 # (2019 stores state FIPS as GCFIP; 2021 and 2023 use GESTFIPS)
@@ -91,7 +97,7 @@ def feature_selection(df):
     df = build_exclusion_target(df)
 
     # filtered rows with every column kept (separate file so the raw combined_data.csv is not overwritten)
-    df.to_csv("data/filtered_data.csv", index=False)
+    df.to_csv(DATA_DIR / "filtered_data.csv", index=False)
 
     predictor_variables = [
         "PRTAGE",    # age
@@ -111,20 +117,20 @@ def feature_selection(df):
     columns_to_drop = [col for col in df.columns if col not in predictor_variables]
     df = df.drop(columns=columns_to_drop, errors='ignore')
 
-    df.to_csv("data/predictor_data.csv", index=False)
+    df.to_csv(DATA_DIR / "predictor_data.csv", index=False)
     return df
 
 
 def main():
 
     # only the raw survey files; data/*.csv would also pick up this script's own outputs
-    csv_files = sorted(glob.glob("data/nov*pub.csv"))
+    csv_files = sorted(glob.glob(str(DATA_DIR / "nov*pub.csv")))
 
     if not csv_files:
         print("No raw census files (nov*pub.csv) were found in the data/ folder.")
         return None
 
-    combined_file = "data/combined_data.csv"
+    combined_file = DATA_DIR / "combined_data.csv"
     concat_csv_files(csv_files, combined_file)
 
     df = load_data(combined_file)

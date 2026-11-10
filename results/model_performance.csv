@@ -1,16 +1,16 @@
 Experiment,Model,Test Size,Accuracy,Balanced Accuracy,Precision,Recall,F1 (excluded),Macro F1,ROC AUC,Correct Connected (TN),False Alarms (FP),Missed Excluded (FN),Correct Excluded (TP)
 Random split,Logistic Regression,5629,0.675,0.675,0.576,0.671,0.62,0.668,0.733,2314,1097,730,1488
 Random split,Decision Tree,5629,0.662,0.67,0.555,0.712,0.624,0.658,0.716,2144,1267,638,1580
-Random split,Random Forest,5629,0.684,0.682,0.585,0.677,0.628,0.676,0.739,2346,1065,716,1502
+Random split,Random Forest,5629,0.683,0.682,0.585,0.676,0.627,0.676,0.739,2345,1066,718,1500
 Random split,XGBoost,5629,0.684,0.686,0.583,0.696,0.635,0.678,0.74,2307,1104,674,1544
 Random split,Baseline (always connected),5629,0.606,0.5,0.0,0.0,0.0,0.377,0.5,3411,0,2218,0
 "Train 2019+2021, test 2023",Logistic Regression,6268,0.672,0.665,0.506,0.645,0.567,0.651,0.726,2860,1318,741,1349
 "Train 2019+2021, test 2023",Decision Tree,6268,0.665,0.662,0.499,0.651,0.565,0.647,0.704,2810,1368,729,1361
-"Train 2019+2021, test 2023",Random Forest,6268,0.673,0.668,0.508,0.653,0.571,0.653,0.726,2855,1323,726,1364
+"Train 2019+2021, test 2023",Random Forest,6268,0.675,0.67,0.509,0.657,0.574,0.655,0.726,2856,1322,717,1373
 "Train 2019+2021, test 2023",XGBoost,6268,0.675,0.672,0.51,0.662,0.576,0.656,0.728,2848,1330,706,1384
 "Train 2019+2021, test 2023",Baseline (always connected),6268,0.667,0.5,0.0,0.0,0.0,0.4,0.5,4178,0,2090,0
 Reduced (4 predictors),Logistic Regression,5629,0.663,0.659,0.563,0.642,0.6,0.654,0.71,2307,1104,794,1424
 Reduced (4 predictors),Decision Tree,5629,0.669,0.652,0.58,0.573,0.577,0.652,0.7,2492,919,947,1271
-Reduced (4 predictors),Random Forest,5629,0.675,0.669,0.578,0.642,0.609,0.665,0.717,2372,1039,793,1425
+Reduced (4 predictors),Random Forest,5629,0.674,0.668,0.578,0.642,0.608,0.664,0.717,2370,1041,795,1423
 Reduced (4 predictors),XGBoost,5629,0.668,0.668,0.567,0.665,0.612,0.661,0.718,2287,1124,744,1474
 Reduced (4 predictors),Baseline (always connected),5629,0.606,0.5,0.0,0.0,0.0,0.377,0.5,3411,0,2218,0

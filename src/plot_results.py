@@ -1,10 +1,10 @@
 # Title: plot_results.py
 # Description: Draws charts of model performance from results/model_performance.csv (written by main.py).
-# Run on its own to redraw the charts without retraining: python plot_results.py
+# Run on its own to redraw the charts without retraining: python src/plot_results.py
 #
 # Outputs:
 #   results/model_performance.png  - Accuracy, Macro F1 and ROC AUC for every model in every experiment
-#   results/confusion_matrix.png   - predicted vs actual for the best model in the first experiment
+#   results/confusion_matrix.png   - predicted vs actual for the best model in each experiment
 
 import sys
 from pathlib import Path
@@ -15,7 +15,7 @@ import matplotlib.pyplot as plt
 import numpy as np
 import pandas as pd
 
-RESULTS_FILE = "results/model_performance.csv"
+RESULTS_FILE = Path(__file__).resolve().parent.parent / "results" / "model_performance.csv"
 PERFORMANCE_CHART = "performance_chart"
 CONFUSION_CHART = "confusion_chart"
 
@@ -98,13 +98,15 @@ def plot_performance(df, path):
     plt.close(fig)
 
 
-# 2x2 predicted-vs-actual grid for the best model (highest macro F1) in one experiment
-def plot_confusion(df, path, experiment=None):
-    if experiment is None:
-        experiment = df["Experiment"].iloc[0]
+# best (highest macro F1) non-baseline model in one experiment
+def best_model_row(df, experiment):
     rows = df[(df["Experiment"] == experiment) & ~df["Model"].str.startswith(BASELINE_PREFIX)]
-    best = rows.loc[rows["Macro F1"].idxmax()]
+    return rows.loc[rows["Macro F1"].idxmax()]
 
+
+# one 2x2 predicted-vs-actual grid; cells are shaded by share of the actual class so panels with
+# different test sizes stay comparable
+def draw_confusion(ax, best, experiment, cmap, show_row_labels=True):
     tn, fp = best["Correct Connected (TN)"], best["False Alarms (FP)"]
     fn, tp = best["Missed Excluded (FN)"], best["Correct Excluded (TP)"]
     counts = np.array([[tn, fp], [fn, tp]])
@@ -112,23 +114,20 @@ def plot_confusion(df, path, experiment=None):
     notes = [["correct", "false alarm"], ["missed", "correct"]]
     row_names = ["connected", "excluded"]
 
-    fig, ax = plt.subplots(figsize=(7, 5.6), facecolor=SURFACE)
-    cmap = matplotlib.colors.LinearSegmentedColormap.from_list("blue", SEQUENTIAL_BLUE)
-    ax.imshow(counts, cmap=cmap, vmin=0, vmax=counts.max())
-
+    ax.imshow(shares, cmap=cmap, vmin=0, vmax=1)
     for r in range(2):
         for c in range(2):
-            dark_cell = counts[r, c] > counts.max() * 0.55
-            color = SURFACE if dark_cell else TEXT_PRIMARY
+            color = SURFACE if shares[r, c] > 0.6 else TEXT_PRIMARY
             ax.text(c, r - 0.08, f"{counts[r, c]:,}", ha="center", va="center",
-                    fontsize=20, fontweight="bold", color=color)
+                    fontsize=18, fontweight="bold", color=color)
             ax.text(c, r + 0.18, f"{notes[r][c]}\n{shares[r, c]:.0%} of actually {row_names[r]}",
-                    ha="center", va="center", fontsize=9.5, color=color)
+                    ha="center", va="center", fontsize=9, color=color)
 
     ax.set_xticks([0, 1])
-    ax.set_xticklabels(["Predicted connected", "Predicted excluded"], color=TEXT_PRIMARY)
+    ax.set_xticklabels(["Predicted\nconnected", "Predicted\nexcluded"], color=TEXT_PRIMARY)
     ax.set_yticks([0, 1])
-    ax.set_yticklabels(["Actually connected", "Actually excluded"], color=TEXT_PRIMARY)
+    ax.set_yticklabels(["Actually\nconnected", "Actually\nexcluded"] if show_row_labels else [],
+                       color=TEXT_PRIMARY)
     ax.tick_params(length=0)
     ax.xaxis.set_label_position("top")
     ax.xaxis.tick_top()
@@ -140,16 +139,29 @@ def plot_confusion(df, path, experiment=None):
     ax.tick_params(which="minor", length=0)
 
     total = counts.sum()
-    fig.suptitle(f"{best['Model']}: predicted vs actual digital exclusion", fontsize=13,
-                 color=TEXT_PRIMARY)
-    ax.set_title(f"{experiment} test set, n={total:,}  |  accuracy {tn + tp:,} / {total:,} = "
-                 f"{(tn + tp) / total:.3f}", fontsize=10, color=TEXT_SECONDARY, pad=34)
-    fig.tight_layout()
+    ax.set_title(f"{experiment}\n{best['Model']}  |  n={total:,}  |  accuracy {(tn + tp) / total:.3f}",
+                 fontsize=10, color=TEXT_PRIMARY, pad=40)
+
+
+# confusion matrix for the best model in every experiment, side by side
+def plot_confusion(df, path):
+    experiments = list(dict.fromkeys(df["Experiment"]))
+    cmap = matplotlib.colors.LinearSegmentedColormap.from_list("blue", SEQUENTIAL_BLUE)
+
+    fig, axes = plt.subplots(1, len(experiments), figsize=(5.6 * len(experiments), 5.6),
+                             facecolor=SURFACE, squeeze=False)
+    for i, (ax, experiment) in enumerate(zip(axes[0], experiments)):
+        draw_confusion(ax, best_model_row(df, experiment), experiment, cmap, show_row_labels=i == 0)
+
+    fig.suptitle("Best model in each experiment: predicted vs actual digital exclusion", fontsize=13,
+                 color=TEXT_PRIMARY, y=0.98)
+    fig.tight_layout(rect=(0, 0, 1, 0.92))
     fig.savefig(path, dpi=200, facecolor=SURFACE)
     plt.close(fig)
 
 
-def main(results_file=RESULTS_FILE):
+def main(results_file=None):
+    results_file = results_file or RESULTS_FILE
     if not Path(results_file).exists():
         print(f"No results table found at {results_file}; run main.py first.")
         return None

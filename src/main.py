@@ -23,7 +23,7 @@ from xgboost import XGBClassifier
 import dataPrep
 import plot_results
 
-PREDICTOR_FILE = "data/predictor_data.csv"
+PREDICTOR_FILE = dataPrep.DATA_DIR / "predictor_data.csv"
 
 # nominal census codes (the number itself has no order, e.g. state FIPS) -> one-hot encoded
 CATEGORICAL_FEATURES = ["PESEX", "PTDTRACE", "PEMARITL", "HETENURE", "GESTFIPS", "PEMLR"]
@@ -52,7 +52,7 @@ DISABILITY_GROUP = "DISABILITY_TYPE"
 REDUCED_FEATURE_COUNT = 4
 
 # performance table and charts written by main()
-RESULTS_FILE = "results/model_performance.csv"
+RESULTS_FILE = dataPrep.PROJECT_ROOT / "results" / "model_performance.csv"
 BASELINE_NAME = "Baseline (always connected)"
 
 # experiment labels used in the results table and charts
@@ -271,7 +271,8 @@ def results_table(results, experiment):
     return pd.DataFrame(rows).round(3)
 
 
-def save_results(df, path=RESULTS_FILE):
+def save_results(df, path=None):
+    path = path or RESULTS_FILE
     Path(path).parent.mkdir(parents=True, exist_ok=True)
     df.to_csv(path, index=False)
     print(f"\nSaved model performance table to {path}")
@@ -334,7 +335,7 @@ def main():
     print(summary.to_string(index=False))
 
     # Step 7: save the performance table and draw the charts from it
-    save_results(pd.concat(tables, ignore_index=True))
+    save_results(pd.concat(tables, ignore_index=True), RESULTS_FILE)
     plot_results.main(RESULTS_FILE)
     return summary
 

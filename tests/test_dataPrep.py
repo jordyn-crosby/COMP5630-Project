@@ -1,14 +1,14 @@
 # Title: test_dataPrep.py
 # Description: Unit tests for dataPrep.py.
-# Run with: python -m unittest test_dataPrep -v
+# Run with: python -m unittest tests.test_dataPrep -v
 #
-# Every test runs inside a temporary directory, because feature_selection() and
-# main() read/write hard-coded "data/..." paths relative to the working directory.
-# This keeps the real data/ folder untouched.
+# Every test runs inside a temporary directory with dataPrep.DATA_DIR pointed at it,
+# so feature_selection() and main() never touch the real data/ folder.
 
 import os
 import tempfile
 import unittest
+from pathlib import Path
 from unittest import mock
 
 import pandas as pd
@@ -24,6 +24,9 @@ class TempDirTestCase(unittest.TestCase):
         self._tmp = tempfile.TemporaryDirectory()
         os.chdir(self._tmp.name)
         os.makedirs("data")
+        patcher = mock.patch.object(dataPrep, "DATA_DIR", Path(self._tmp.name) / "data")
+        patcher.start()
+        self.addCleanup(patcher.stop)
 
     def tearDown(self):
         os.chdir(self._orig_cwd)

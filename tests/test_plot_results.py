@@ -1,12 +1,13 @@
 # Title: test_plot_results.py
 # Description: Unit tests for plot_results.py.
-# Run with: python -m unittest test_plot_results -v
+# Run with: python -m unittest tests.test_plot_results -v
 #
 # Tests write a small synthetic results table into a temporary directory, so the real results/ folder is untouched.
 
 import os
 import tempfile
 import unittest
+from pathlib import Path
 from unittest import mock
 
 import pandas as pd
@@ -43,6 +44,10 @@ class TestPlotResults(unittest.TestCase):
         self._tmp = tempfile.TemporaryDirectory()
         os.chdir(self._tmp.name)
         os.makedirs("results")
+        patcher = mock.patch.object(plot_results, "RESULTS_FILE",
+                                    Path(self._tmp.name) / "results" / "model_performance.csv")
+        patcher.start()
+        self.addCleanup(patcher.stop)
 
     def tearDown(self):
         os.chdir(self._orig_cwd)
@@ -61,6 +66,12 @@ class TestPlotResults(unittest.TestCase):
         with mock.patch("builtins.print"):
             paths = plot_results.main()
         self.assertTrue(all(os.path.exists(p) for p in paths.values()))
+
+    def test_best_model_is_picked_per_experiment(self):
+        df = make_results()
+        for experiment in df["Experiment"].unique():
+            # XGBoost has the highest macro F1 in the synthetic table; baselines are never picked
+            self.assertEqual(plot_results.best_model_row(df, experiment)["Model"], "XGBoost")
 
     def test_missing_results_file_returns_none(self):
         with mock.patch("builtins.print") as mock_print:
