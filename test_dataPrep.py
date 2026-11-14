@@ -162,6 +162,7 @@ class TestBuildExclusionTarget(unittest.TestCase):
     def test_use_only_away_from_home_is_not_excluded(self):
         self.assertEqual(self.target_for(PEINLICO=1), 0)
         self.assertEqual(self.target_for(PEINWORK=1), 0)
+        self.assertEqual(self.target_for(PEINTRAV=1), 0)
 
     def test_no_use_anywhere_is_excluded(self):
         self.assertEqual(self.target_for(), 1)

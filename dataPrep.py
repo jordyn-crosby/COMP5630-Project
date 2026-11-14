@@ -35,6 +35,7 @@ INTERNET_USE_COLUMNS = [
     "PEINCAFE",  # coffee shop or other business
     "PEINLICO",  # library or community center
     "PEINELHO",  # someone else's home
+    "PEINTRAV",  # while traveling or commuting
     "PEINOTHR",  # other location
 ]
 

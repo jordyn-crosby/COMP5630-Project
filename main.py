@@ -6,7 +6,10 @@
 
 from pathlib import Path
 
+import numpy as np
 import pandas as pd
+
+from sklearn.base import clone
 
 from sklearn.compose import ColumnTransformer
 from sklearn.linear_model import LogisticRegression
@@ -15,7 +18,7 @@ from sklearn.pipeline import Pipeline
 from sklearn.preprocessing import OneHotEncoder, StandardScaler
 from sklearn.tree import DecisionTreeClassifier
 from sklearn.ensemble import RandomForestClassifier
-from sklearn.metrics import accuracy_score, balanced_accuracy_score, classification_report, confusion_matrix, \
+from sklearn.metrics import get_scorer, accuracy_score, balanced_accuracy_score, classification_report, confusion_matrix, \
     f1_score, precision_score, recall_score, roc_auc_score
 
 from xgboost import XGBClassifier
@@ -59,6 +62,15 @@ BASELINE_NAME = "Baseline (always connected)"
 RANDOM_EXPERIMENT = "Random split"
 TEMPORAL_EXPERIMENT = f"Train {TEMPORAL_TRAIN_YEARS[0]}+{TEMPORAL_TRAIN_YEARS[1]}, test {TEMPORAL_TEST_YEAR}"
 REDUCED_EXPERIMENT = f"Reduced ({REDUCED_FEATURE_COUNT} predictors)"
+ACCURACY_EXPERIMENT = "Accuracy-tuned (unweighted)"
+
+# Hypothesis 1: test accuracy each model is expected to reach with the ten predictors
+HYPOTHESIS_1_TARGETS = {
+    "Logistic Regression": 0.783,
+    "Decision Tree": 0.807,
+    "Random Forest": 0.800,
+    "XGBoost": 0.790,
+}
 
 # metric used both to tune hyperparameters and to pick the best model
 # (macro F1 weighs both classes equally, so predicting only the majority class scores poorly)
@@ -75,22 +87,24 @@ def build_preprocessor(features=FEATURES):
     ])
 
 
-# Each model with class-imbalance handling and a small hyperparameter grid
-def build_models(y_train):
+# Each model with a small hyperparameter grid. balanced=True weights the classes equally (class-imbalance
+# handling); balanced=False leaves them unweighted, which favors overall accuracy over catching excluded people
+def build_models(y_train, balanced=True):
     # XGBoost has no class_weight option; weight positives by the negative/positive ratio instead
-    pos_weight = (y_train == 0).sum() / max((y_train == 1).sum(), 1)
+    pos_weight = (y_train == 0).sum() / max((y_train == 1).sum(), 1) if balanced else 1
+    class_weight = "balanced" if balanced else None
 
     return {
         "Logistic Regression": (
-            LogisticRegression(max_iter=1000, solver="liblinear", class_weight="balanced"),
+            LogisticRegression(max_iter=1000, solver="liblinear", class_weight=class_weight),
             {"model__C": [0.01, 0.1, 1, 10]},
         ),
         "Decision Tree": (
-            DecisionTreeClassifier(random_state=42, class_weight="balanced"),
+            DecisionTreeClassifier(random_state=42, class_weight=class_weight),
             {"model__max_depth": [3, 5, 8, 12], "model__min_samples_leaf": [1, 20, 50]},
         ),
         "Random Forest": (
-            RandomForestClassifier(n_estimators=200, random_state=42, class_weight="balanced"),
+            RandomForestClassifier(n_estimators=200, random_state=42, class_weight=class_weight),
             {"model__max_depth": [5, 10, None], "model__min_samples_leaf": [1, 5, 20]},
         ),
         "XGBoost": (
@@ -101,19 +115,19 @@ def build_models(y_train):
 
 
 # Tune each model with cross-validation on the training data only
-def fit_models(x_train, y_train, cv=5):
+def fit_models(x_train, y_train, cv=5, balanced=True, scoring=SCORING):
     folds = StratifiedKFold(n_splits=cv, shuffle=True, random_state=42)
     features = list(x_train.columns)
 
     models = {}
-    for name, (estimator, param_grid) in build_models(y_train).items():
+    for name, (estimator, param_grid) in build_models(y_train, balanced=balanced).items():
         pipeline = Pipeline([("prep", build_preprocessor(features)), ("model", estimator)])
-        search = GridSearchCV(pipeline, param_grid, scoring=SCORING, cv=folds, n_jobs=-1)
+        search = GridSearchCV(pipeline, param_grid, scoring=scoring, cv=folds, n_jobs=-1)
         search.fit(x_train, y_train)
 
         models[name] = search.best_estimator_
         train_acc = accuracy_score(y_train, search.best_estimator_.predict(x_train))
-        print(f"{name}: best params {search.best_params_}, CV {SCORING}={search.best_score_:.3f}, "
+        print(f"{name}: best params {search.best_params_}, CV {scoring}={search.best_score_:.3f}, "
               f"train accuracy={train_acc:.3f}")
 
     print(" Model Training Complete")
@@ -121,7 +135,7 @@ def fit_models(x_train, y_train, cv=5):
 
 
 # Random 70/30 split, stratified so train and test keep the same class ratio
-def train_models(df=None, target=TARGET, cv=5, features=FEATURES):
+def train_models(df=None, target=TARGET, cv=5, features=FEATURES, balanced=True, scoring=SCORING):
 
     # read in data
     if df is None:
@@ -131,7 +145,7 @@ def train_models(df=None, target=TARGET, cv=5, features=FEATURES):
     y = df[target]  # Target variable
 
     x_train, x_test, y_train, y_test = train_test_split(x, y, test_size=0.3, random_state=42, stratify=y)
-    models = fit_models(x_train, y_train, cv=cv)
+    models = fit_models(x_train, y_train, cv=cv, balanced=balanced, scoring=scoring)
     return models, x_train, x_test, y_train, y_test
 
 
@@ -149,29 +163,37 @@ def train_models_temporal(df=None, target=TARGET, cv=5, features=FEATURES):
     return models, x_train, x_test, y_train, y_test
 
 
-# map a transformed column name (e.g. "cat__GESTFIPS_6") back to the predictor it came from
-def source_feature(column_name):
-    block, name = column_name.split("__", 1)
-    if block == "dis":
-        return DISABILITY_GROUP
-    if block == "cat":
-        return next(f for f in CATEGORICAL_FEATURES if name.startswith(f + "_"))
-    return name
+# model input columns that make up each predictor (the six disability indicators count as one predictor)
+def predictor_groups(features):
+    groups = {}
+    for f in features:
+        groups.setdefault(DISABILITY_GROUP if f in DISABILITY_FEATURES else f, []).append(f)
+    return groups
 
 
-# Feature importance per predictor: |coefficient| for logistic regression, impurity/gain importance for trees.
-# Each model's scores are normalized to sum to 1, then one-hot columns are summed back to their predictor.
-def feature_importance(models):
+# Permutation importance per predictor: how much the CV score (SCORING) drops when that predictor's columns are
+# shuffled. Measured on held-out folds of the training data only, so the test set plays no part in choosing the
+# reduced model. Each predictor is shuffled as one unit (raw columns, before one-hot encoding), so predictors with
+# many categories (e.g. state) are not inflated. Negative drops count as 0; each model's scores sum to 1.
+def feature_importance(models, x_train, y_train, cv=5, n_repeats=5):
+    folds = StratifiedKFold(n_splits=cv, shuffle=True, random_state=42)
+    groups = predictor_groups(x_train.columns)
+    scorer = get_scorer(SCORING)
+    rng = np.random.default_rng(42)
+
     table = {}
     for name, pipeline in models.items():
-        model = pipeline.named_steps["model"]
-        if hasattr(model, "coef_"):
-            scores = abs(model.coef_[0])
-        else:
-            scores = model.feature_importances_
-        columns = pipeline.named_steps["prep"].get_feature_names_out()
-        scores = pd.Series(scores, index=[source_feature(c) for c in columns])
-        scores = scores.groupby(level=0).sum()
+        drops = pd.Series(0.0, index=list(groups))
+        for train_idx, val_idx in folds.split(x_train, y_train):
+            model = clone(pipeline).fit(x_train.iloc[train_idx], y_train.iloc[train_idx])
+            x_val, y_val = x_train.iloc[val_idx], y_train.iloc[val_idx]
+            base = scorer(model, x_val, y_val)
+            for group, columns in groups.items():
+                for _ in range(n_repeats):
+                    shuffled = x_val.copy()
+                    shuffled[columns] = x_val[columns].to_numpy()[rng.permutation(len(x_val))]
+                    drops[group] += base - scorer(model, shuffled, y_val)
+        scores = (drops / (cv * n_repeats)).clip(lower=0)
         table[name] = scores / scores.sum() if scores.sum() > 0 else scores
 
     importance = pd.DataFrame(table)
@@ -216,7 +238,7 @@ def format_confusion_matrix(cm):
     ])
 
 
-def test_models(models, x_test, y_test):
+def test_models(models, x_test, y_test, select_by="Macro F1"):
     results = []
 
     for name, model in models.items():
@@ -231,15 +253,15 @@ def test_models(models, x_test, y_test):
     baseline_pred = pd.Series(majority, index=y_test.index)
     baseline = compute_metrics(BASELINE_NAME, y_test, baseline_pred, baseline_pred.astype(float))
 
-    # Compare models by macro F1 (the baseline is reported but never picked as best)
-    best_model = max(results, key=lambda r: r["Macro F1"])
+    # Compare models by select_by, macro F1 by default (the baseline is reported but never picked as best)
+    best_model = max(results, key=lambda r: r[select_by])
 
     print("Model Comparison:")
     for r in [baseline] + results:
         print(f"{r['Model']}: Accuracy={r['Accuracy']:.3f}, Balanced Acc={r['Balanced Accuracy']:.3f}, "
               f"Macro F1={r['Macro F1']:.3f}, AUC={r['ROC AUC']:.3f}")
 
-    print(f"\nBest model: {best_model['Model']} with Macro F1={best_model['Macro F1']:.3f}")
+    print(f"\nBest model: {best_model['Model']} with {select_by}={best_model[select_by]:.3f}")
     print(best_model["Classification Report"])
     print(format_confusion_matrix(best_model["Confusion Matrix"]))
 
@@ -277,10 +299,23 @@ def save_results(df, path=RESULTS_FILE):
     print(f"\nSaved model performance table to {path}")
 
 
+# Hypothesis 1: does each model's test accuracy reach its target?
+def hypothesis_1_check(results):
+    rows = [{
+        "Model": r["Model"],
+        "Accuracy": round(r["Accuracy"], 3),
+        "Target": HYPOTHESIS_1_TARGETS[r["Model"]],
+        "Gap to Target": round(r["Accuracy"] - HYPOTHESIS_1_TARGETS[r["Model"]], 3),
+        "Met Target": r["Accuracy"] >= HYPOTHESIS_1_TARGETS[r["Model"]],
+    } for r in results if r["Model"] in HYPOTHESIS_1_TARGETS]
+    return pd.DataFrame(rows)
+
+
 def summarize(label, results, best_model):
     return {
         "Experiment": label,
         "Best Model": best_model["Model"],
+        "Accuracy": round(best_model["Accuracy"], 3),
         "Macro F1": round(best_model["Macro F1"], 3),
         "Balanced Accuracy": round(best_model["Balanced Accuracy"], 3),
         "Recall": round(best_model["Recall"], 3),
@@ -303,10 +338,22 @@ def main():
 
     # Step 2 + 3: train and test on a random stratified 70/30 split
     print("\n===== Experiment: random 70/30 split, all ten predictors =====")
-    models, _, x_test, _, y_test = train_models(df)
+    models, x_train, x_test, y_train, y_test = train_models(df)
     results, best_model = test_models(models, x_test, y_test)
     summary.append(summarize(RANDOM_EXPERIMENT, results, best_model))
     tables.append(results_table(results, RANDOM_EXPERIMENT))
+
+    # Step 3b: same split, but unweighted and tuned for accuracy, the measure Hypothesis 1 is stated in
+    print("\n===== Experiment: random 70/30 split, unweighted classes, tuned for accuracy =====")
+    a_models, _, a_x_test, _, a_y_test = train_models(df, balanced=False, scoring="accuracy")
+    a_results, a_best = test_models(a_models, a_x_test, a_y_test, select_by="Accuracy")
+    summary.append(summarize(ACCURACY_EXPERIMENT, a_results, a_best))
+    tables.append(results_table(a_results, ACCURACY_EXPERIMENT))
+
+    print("\n===== Hypothesis 1: test accuracy vs target =====")
+    for label, res in [(RANDOM_EXPERIMENT, results), (ACCURACY_EXPERIMENT, a_results)]:
+        print(f"\n{label}:")
+        print(hypothesis_1_check(res).to_string(index=False))
 
     # Step 4: temporal check, train on 2019 + 2021 and test on 2023
     if YEAR_COLUMN in df.columns:
@@ -317,8 +364,8 @@ def main():
         tables.append(results_table(t_results, TEMPORAL_EXPERIMENT))
 
     # Step 5: which predictors matter most
-    importance = feature_importance(models)
-    print("\n===== Feature importance (normalized, grouped by predictor) =====")
+    importance = feature_importance(models, x_train, y_train)
+    print("\n===== Permutation importance (CV on training data, normalized, grouped by predictor) =====")
     print(importance.round(3).to_string())
 
     # Step 6: parsimonious model on the top predictors only

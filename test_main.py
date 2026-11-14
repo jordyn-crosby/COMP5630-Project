@@ -89,8 +89,8 @@ class TestFeatureImportance(unittest.TestCase):
     @classmethod
     def setUpClass(cls):
         with mock.patch("builtins.print"):
-            cls.models = main.train_models(make_df(), cv=2)[0]
-        cls.importance = main.feature_importance(cls.models)
+            cls.models, cls.x_train, _, cls.y_train, _ = main.train_models(make_df(), cv=2)
+        cls.importance = main.feature_importance(cls.models, cls.x_train, cls.y_train, cv=2, n_repeats=2)
 
     def test_one_row_per_predictor(self):
         expected = set(main.NUMERIC_FEATURES + main.CATEGORICAL_FEATURES) | {main.DISABILITY_GROUP}
@@ -104,10 +104,11 @@ class TestFeatureImportance(unittest.TestCase):
     def test_learnable_predictors_rank_highest(self):
         self.assertEqual(set(self.importance.index[:2]), {"PRTAGE", "HEFAMINC"})
 
-    def test_source_feature_mapping(self):
-        self.assertEqual(main.source_feature("num__PRTAGE"), "PRTAGE")
-        self.assertEqual(main.source_feature("cat__GESTFIPS_36"), "GESTFIPS")
-        self.assertEqual(main.source_feature("dis__DIS_VISION"), main.DISABILITY_GROUP)
+    def test_predictor_groups_keep_disability_together(self):
+        groups = main.predictor_groups(main.FEATURES)
+        self.assertEqual(groups[main.DISABILITY_GROUP], main.DISABILITY_FEATURES)
+        self.assertEqual(groups["GESTFIPS"], ["GESTFIPS"])
+        self.assertEqual(len(groups), 10)
 
     def test_expand_features(self):
         self.assertEqual(main.expand_features(["PRTAGE", main.DISABILITY_GROUP]),
@@ -189,7 +190,7 @@ class TestMain(unittest.TestCase):
     def test_skips_data_prep_when_predictor_file_exists(self):
         make_df().to_csv(main.PREDICTOR_FILE, index=False)
         real_fit = main.fit_models
-        fast_fit = lambda x, y, cv=5: real_fit(x, y, cv=2)
+        fast_fit = lambda x, y, cv=5, **kwargs: real_fit(x, y, cv=2, **kwargs)
 
         with mock.patch("builtins.print"), \
                 mock.patch.object(main.dataPrep, "main") as prep, \
@@ -198,10 +199,11 @@ class TestMain(unittest.TestCase):
 
         prep.assert_not_called()
         self.assertEqual(summary["Experiment"].tolist(),
-                         [main.RANDOM_EXPERIMENT, main.TEMPORAL_EXPERIMENT, main.REDUCED_EXPERIMENT])
+                         [main.RANDOM_EXPERIMENT, main.ACCURACY_EXPERIMENT, main.TEMPORAL_EXPERIMENT,
+                          main.REDUCED_EXPERIMENT])
 
         table = pd.read_csv(main.RESULTS_FILE)
-        self.assertEqual(len(table), 15)  # 3 experiments x (4 models + baseline)
+        self.assertEqual(len(table), 20)  # 4 experiments x (4 models + baseline)
         self.assertTrue(os.path.getsize("results/model_performance.png") > 0)
         self.assertTrue(os.path.getsize("results/confusion_matrix.png") > 0)
 
