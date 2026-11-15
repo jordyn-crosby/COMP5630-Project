@@ -1,16 +1,21 @@
 Experiment,Model,Test Size,Accuracy,Balanced Accuracy,Precision,Recall,F1 (excluded),Macro F1,ROC AUC,Correct Connected (TN),False Alarms (FP),Missed Excluded (FN),Correct Excluded (TP)
-Random split,Logistic Regression,5629,0.675,0.675,0.576,0.671,0.62,0.668,0.733,2314,1097,730,1488
-Random split,Decision Tree,5629,0.662,0.67,0.555,0.712,0.624,0.658,0.716,2144,1267,638,1580
-Random split,Random Forest,5629,0.683,0.682,0.585,0.676,0.627,0.676,0.739,2345,1066,718,1500
-Random split,XGBoost,5629,0.684,0.686,0.583,0.696,0.635,0.678,0.74,2307,1104,674,1544
-Random split,Baseline (always connected),5629,0.606,0.5,0.0,0.0,0.0,0.377,0.5,3411,0,2218,0
-"Train 2019+2021, test 2023",Logistic Regression,6268,0.672,0.665,0.506,0.645,0.567,0.651,0.726,2860,1318,741,1349
-"Train 2019+2021, test 2023",Decision Tree,6268,0.665,0.662,0.499,0.651,0.565,0.647,0.704,2810,1368,729,1361
-"Train 2019+2021, test 2023",Random Forest,6268,0.675,0.67,0.509,0.657,0.574,0.655,0.726,2856,1322,717,1373
-"Train 2019+2021, test 2023",XGBoost,6268,0.675,0.672,0.51,0.662,0.576,0.656,0.728,2848,1330,706,1384
-"Train 2019+2021, test 2023",Baseline (always connected),6268,0.667,0.5,0.0,0.0,0.0,0.4,0.5,4178,0,2090,0
-Reduced (4 predictors),Logistic Regression,5629,0.663,0.659,0.563,0.642,0.6,0.654,0.71,2307,1104,794,1424
-Reduced (4 predictors),Decision Tree,5629,0.669,0.652,0.58,0.573,0.577,0.652,0.7,2492,919,947,1271
-Reduced (4 predictors),Random Forest,5629,0.674,0.668,0.578,0.642,0.608,0.664,0.717,2370,1041,795,1423
-Reduced (4 predictors),XGBoost,5629,0.668,0.668,0.567,0.665,0.612,0.661,0.718,2287,1124,744,1474
-Reduced (4 predictors),Baseline (always connected),5629,0.606,0.5,0.0,0.0,0.0,0.377,0.5,3411,0,2218,0
+Pooled 70/30 (household-grouped),Logistic Regression,5629,0.684,0.682,0.576,0.673,0.621,0.675,0.737,2393,1073,707,1456
+Pooled 70/30 (household-grouped),Decision Tree,5629,0.671,0.658,0.568,0.602,0.584,0.656,0.694,2475,991,861,1302
+Pooled 70/30 (household-grouped),Random Forest,5629,0.684,0.685,0.575,0.686,0.626,0.676,0.739,2368,1098,679,1484
+Pooled 70/30 (household-grouped),XGBoost,5629,0.682,0.681,0.572,0.68,0.622,0.674,0.739,2367,1099,692,1471
+Pooled 70/30 (household-grouped),Baseline (always connected),5629,0.616,0.5,0.0,0.0,0.0,0.381,0.5,3466,0,2163,0
+"Train 2019+2021, test 2023",Logistic Regression,6268,0.675,0.668,0.498,0.651,0.564,0.652,0.729,2908,1330,709,1321
+"Train 2019+2021, test 2023",Decision Tree,6268,0.66,0.656,0.481,0.644,0.551,0.639,0.703,2828,1410,722,1308
+"Train 2019+2021, test 2023",Random Forest,6268,0.676,0.672,0.5,0.662,0.569,0.655,0.728,2892,1346,686,1344
+"Train 2019+2021, test 2023",XGBoost,6268,0.675,0.672,0.498,0.667,0.57,0.654,0.729,2875,1363,677,1353
+"Train 2019+2021, test 2023",Baseline (always connected),6268,0.676,0.5,0.0,0.0,0.0,0.403,0.5,4238,0,2030,0
+"Reduced (age, income, education, disability)",Logistic Regression,5629,0.677,0.673,0.57,0.653,0.609,0.667,0.73,2399,1067,750,1413
+"Reduced (age, income, education, disability)",Decision Tree,5629,0.671,0.658,0.568,0.602,0.584,0.656,0.694,2475,991,861,1302
+"Reduced (age, income, education, disability)",Random Forest,5629,0.668,0.669,0.556,0.672,0.609,0.66,0.728,2307,1159,709,1454
+"Reduced (age, income, education, disability)",XGBoost,5629,0.675,0.675,0.564,0.675,0.615,0.666,0.732,2336,1130,702,1461
+"Reduced (age, income, education, disability)",Baseline (always connected),5629,0.616,0.5,0.0,0.0,0.0,0.381,0.5,3466,0,2163,0
+"Accuracy-tuned, unweighted (sensitivity)",Logistic Regression,5629,0.698,0.653,0.652,0.458,0.538,0.657,0.737,2938,528,1172,991
+"Accuracy-tuned, unweighted (sensitivity)",Decision Tree,5629,0.687,0.648,0.621,0.479,0.541,0.652,0.716,2832,634,1126,1037
+"Accuracy-tuned, unweighted (sensitivity)",Random Forest,5629,0.703,0.659,0.661,0.469,0.548,0.664,0.739,2945,521,1149,1014
+"Accuracy-tuned, unweighted (sensitivity)",XGBoost,5629,0.699,0.663,0.635,0.509,0.565,0.667,0.739,2833,633,1063,1100
+"Accuracy-tuned, unweighted (sensitivity)",Baseline (always connected),5629,0.616,0.5,0.0,0.0,0.0,0.381,0.5,3466,0,2163,0

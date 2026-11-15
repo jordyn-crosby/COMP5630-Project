@@ -1,0 +1,70 @@
+===== Dummy (majority) =====
+              precision    recall  f1-score   support
+
+        user       0.62      1.00      0.76      3466
+    excluded       0.00      0.00      0.00      2163
+
+    accuracy                           0.62      5629
+   macro avg       0.31      0.50      0.38      5629
+weighted avg       0.38      0.62      0.47      5629
+
+Confusion matrix [[TN FP] [FN TP]]:
+[[3466    0]
+ [2163    0]]
+
+===== Logistic Regression =====
+              precision    recall  f1-score   support
+
+        user       0.77      0.69      0.73      3466
+    excluded       0.58      0.67      0.62      2163
+
+    accuracy                           0.68      5629
+   macro avg       0.67      0.68      0.67      5629
+weighted avg       0.70      0.68      0.69      5629
+
+Confusion matrix [[TN FP] [FN TP]]:
+[[2393 1073]
+ [ 707 1456]]
+
+===== Decision Tree =====
+              precision    recall  f1-score   support
+
+        user       0.74      0.71      0.73      3466
+    excluded       0.57      0.60      0.58      2163
+
+    accuracy                           0.67      5629
+   macro avg       0.65      0.66      0.66      5629
+weighted avg       0.68      0.67      0.67      5629
+
+Confusion matrix [[TN FP] [FN TP]]:
+[[2475  991]
+ [ 861 1302]]
+
+===== Random Forest =====
+              precision    recall  f1-score   support
+
+        user       0.78      0.68      0.73      3466
+    excluded       0.57      0.69      0.63      2163
+
+    accuracy                           0.68      5629
+   macro avg       0.68      0.68      0.68      5629
+weighted avg       0.70      0.68      0.69      5629
+
+Confusion matrix [[TN FP] [FN TP]]:
+[[2368 1098]
+ [ 679 1484]]
+
+===== XGBoost =====
+              precision    recall  f1-score   support
+
+        user       0.77      0.68      0.73      3466
+    excluded       0.57      0.68      0.62      2163
+
+    accuracy                           0.68      5629
+   macro avg       0.67      0.68      0.67      5629
+weighted avg       0.70      0.68      0.69      5629
+
+Confusion matrix [[TN FP] [FN TP]]:
+[[2367 1099]
+ [ 692 1471]]
+

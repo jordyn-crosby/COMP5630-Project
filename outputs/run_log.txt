@@ -1,0 +1,70 @@
+
+===== Experiment B_temporal: develop and tune on 2019+2021 (household-grouped stratified CV), refit on all development records, evaluate once on 2023 =====
+  train/dev: {'n': 12494, 'excluded': 5178, 'exclusion_rate': 0.4144, 'households': 11230, 'years': {2019: 6610, 2021: 5884}}
+  test:      {'n': 6268, 'excluded': 2030, 'exclusion_rate': 0.3239, 'households': 5645, 'years': {2023: 6268}}
+  Logistic Regression: best {'model__C': 0.01}  CV f1_macro=0.679  (3.4s)
+  Decision Tree: best {'model__max_depth': 5, 'model__min_samples_leaf': 1}  CV f1_macro=0.664  (4.1s)
+  Random Forest: best {'model__max_depth': 10, 'model__min_samples_leaf': 1}  CV f1_macro=0.678  (80.3s)
+  XGBoost: best {'model__learning_rate': 0.1, 'model__max_depth': 3, 'model__n_estimators': 300}  CV f1_macro=0.680  (13.9s)
+  Model training complete
+  Model testing complete
+
+  Model comparison on held-out records:
+    Dummy (majority)     Acc=0.676  BalAcc=0.500  Prec=0.000  Rec=0.000  F1=0.000  MacroF1=0.403  AUC=0.500
+    Logistic Regression  Acc=0.675  BalAcc=0.668  Prec=0.498  Rec=0.651  F1=0.564  MacroF1=0.652  AUC=0.729
+    Decision Tree        Acc=0.660  BalAcc=0.656  Prec=0.481  Rec=0.644  F1=0.551  MacroF1=0.639  AUC=0.703
+    Random Forest        Acc=0.676  BalAcc=0.672  Prec=0.500  Rec=0.662  F1=0.569  MacroF1=0.655  AUC=0.728
+    XGBoost              Acc=0.675  BalAcc=0.672  Prec=0.498  Rec=0.667  F1=0.570  MacroF1=0.654  AUC=0.729
+
+  Hypotheses:
+Hypothesis               Model                  Metric                                            Value                                  Target   Met
+        H1 Logistic Regression            Accuracy (%)                                            67.47                                    78.3 False
+        H1       Decision Tree            Accuracy (%)                                            65.99                                    80.7 False
+        H1       Random Forest            Accuracy (%)                                            67.58                                    80.0 False
+        H1             XGBoost            Accuracy (%)                                            67.45                                    79.0 False
+        H1           any model at least one target met                                            False                                    True False
+        H2 RF & XGB vs LR & DT                Accuracy ensembles 0.6745-0.6758 vs singles 0.6599-0.6747 both ensembles above both single models False
+        H2 RF & XGB vs LR & DT                Macro F1 ensembles 0.6541-0.6548 vs singles 0.6386-0.6524 both ensembles above both single models  True
+        H2 RF & XGB vs LR & DT                 ROC AUC ensembles 0.7284-0.7290 vs singles 0.7035-0.7294 both ensembles above both single models False
+  Saved results to outputs/B_temporal/
+
+===== Experiment A_pooled: pooled 2019+2021+2023, outcome-stratified ~70/30 split keeping households together, household-grouped stratified CV inside training =====
+  train/dev: {'n': 13133, 'excluded': 5045, 'exclusion_rate': 0.3841, 'households': 11815, 'years': {2019: 4664, 2021: 4095, 2023: 4374}}
+  test:      {'n': 5629, 'excluded': 2163, 'exclusion_rate': 0.3843, 'households': 5060, 'years': {2019: 1946, 2021: 1789, 2023: 1894}}
+  Logistic Regression: best {'model__C': 0.01}  CV f1_macro=0.669  (1.6s)
+  Decision Tree: best {'model__max_depth': 3, 'model__min_samples_leaf': 1}  CV f1_macro=0.662  (3.6s)
+  Random Forest: best {'model__max_depth': None, 'model__min_samples_leaf': 5}  CV f1_macro=0.670  (81.6s)
+  XGBoost: best {'model__learning_rate': 0.1, 'model__max_depth': 3, 'model__n_estimators': 100}  CV f1_macro=0.671  (13.1s)
+  Model training complete
+  Model testing complete
+
+  Model comparison on held-out records:
+    Dummy (majority)     Acc=0.616  BalAcc=0.500  Prec=0.000  Rec=0.000  F1=0.000  MacroF1=0.381  AUC=0.500
+    Logistic Regression  Acc=0.684  BalAcc=0.682  Prec=0.576  Rec=0.673  F1=0.621  MacroF1=0.675  AUC=0.737
+    Decision Tree        Acc=0.671  BalAcc=0.658  Prec=0.568  Rec=0.602  F1=0.584  MacroF1=0.656  AUC=0.694
+    Random Forest        Acc=0.684  BalAcc=0.685  Prec=0.575  Rec=0.686  F1=0.626  MacroF1=0.676  AUC=0.739
+    XGBoost              Acc=0.682  BalAcc=0.681  Prec=0.572  Rec=0.680  F1=0.622  MacroF1=0.674  AUC=0.739
+
+  Hypotheses:
+Hypothesis               Model                  Metric                                            Value                                  Target   Met
+        H1 Logistic Regression            Accuracy (%)                                            68.38                                    78.3 False
+        H1       Decision Tree            Accuracy (%)                                             67.1                                    80.7 False
+        H1       Random Forest            Accuracy (%)                                            68.43                                    80.0 False
+        H1             XGBoost            Accuracy (%)                                            68.18                                    79.0 False
+        H1           any model at least one target met                                            False                                    True False
+        H2 RF & XGB vs LR & DT                Accuracy ensembles 0.6818-0.6843 vs singles 0.6710-0.6838 both ensembles above both single models False
+        H2 RF & XGB vs LR & DT                Macro F1 ensembles 0.6736-0.6763 vs singles 0.6561-0.6748 both ensembles above both single models False
+        H2 RF & XGB vs LR & DT                 ROC AUC ensembles 0.7385-0.7391 vs singles 0.6940-0.7370 both ensembles above both single models  True
+  Saved results to outputs/A_pooled/
+
+===== Summary: held-out accuracy / macro F1 / ROC AUC =====
+  B_temporal  Dummy (majority)     0.676 / 0.403 / 0.500
+  B_temporal  Logistic Regression  0.675 / 0.652 / 0.729
+  B_temporal  Decision Tree        0.660 / 0.639 / 0.703
+  B_temporal  Random Forest        0.676 / 0.655 / 0.728
+  B_temporal  XGBoost              0.675 / 0.654 / 0.729
+  A_pooled    Dummy (majority)     0.616 / 0.381 / 0.500
+  A_pooled    Logistic Regression  0.684 / 0.675 / 0.737
+  A_pooled    Decision Tree        0.671 / 0.656 / 0.694
+  A_pooled    Random Forest        0.684 / 0.676 / 0.739
+  A_pooled    XGBoost              0.682 / 0.674 / 0.739

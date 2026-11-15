@@ -1,4 +1,4 @@
-# Puts src/ on the import path so the tests can import main, dataPrep and plot_results directly.
+# Puts src/ on the import path so the tests can import dataPrep, main, h3_feature_reduction and plot_results directly.
 import os
 import sys
 

@@ -1,344 +1,563 @@
 # Main Python File: main.py
-# The purpose of this file is to run all phases of the experiment
-# including data preparation, model training, and model testing. It predicts digital exclusion
-# (no internet use at any location) among adults 65+ with a disability, compares four models,
-# checks performance across survey years, ranks feature importance, and tests a reduced feature set.
+# Runs the two promised experiments for "Who Gets Left Behind?" (COMP 6630, Hall & Crosby):
+#
+#   Experiment B (temporal, run first): develop and tune on 2019 + 2021, refit on all development
+#                                        records, evaluate once on 2023.
+#   Experiment A (pooled):               pool the three years, outcome-stratified 70/30 split that keeps
+#                                        household members together, tune with k-fold CV inside the
+#                                        training set, evaluate on the held-out 30 percent.
+#
+# One binary outcome (DIGITAL_EXCLUSION), fifteen raw inputs across the ten predictor groups, a
+# majority-class dummy baseline fitted on training labels, and four classifiers (logistic regression,
+# decision tree, random forest, XGBoost) tuned on identical CV folds with the same scoring rule.
+# All preprocessing lives inside each model's Pipeline, so it is fit on training folds only.
+# Model families, grids, outcome rule and scoring are frozen in this file before either experiment runs;
+# nothing from the test sets feeds back into tuning.
+#
+# Saved per experiment under outputs/<experiment>/:
+#   model_comparison.csv, test_predictions.csv, best_params.json, cv_summary.csv, cv_folds.csv,
+#   confusion_matrices.csv, classification_reports.txt, logistic_coefficients.csv,
+#   tree_importances.csv, permutation_importance.csv, hypotheses.csv, run_manifest.json
+#
+# Run:  python main.py                 (both experiments; runs dataPrep first if data/predictor_data.csv is missing)
+#       python main.py --experiment A  (pooled only)   python main.py --experiment B  (temporal only)
+#       python main.py --cv 3 --quick  (smaller grids, for a smoke test)
 
-from pathlib import Path
+import argparse
+import json
+import os
+import platform
+import sys
+import time
+from datetime import datetime, timezone
 
+import numpy as np
 import pandas as pd
-
+import sklearn
+import xgboost
+from sklearn.base import clone
 from sklearn.compose import ColumnTransformer
+from sklearn.dummy import DummyClassifier
+from sklearn.ensemble import RandomForestClassifier
+from sklearn.inspection import permutation_importance
 from sklearn.linear_model import LogisticRegression
-from sklearn.model_selection import GridSearchCV, StratifiedKFold, train_test_split
+from sklearn.metrics import (accuracy_score, balanced_accuracy_score, classification_report, confusion_matrix,
+                             f1_score, precision_score, recall_score, roc_auc_score)
+from sklearn.model_selection import GridSearchCV, StratifiedGroupKFold
 from sklearn.pipeline import Pipeline
 from sklearn.preprocessing import OneHotEncoder, StandardScaler
 from sklearn.tree import DecisionTreeClassifier
-from sklearn.ensemble import RandomForestClassifier
-from sklearn.metrics import accuracy_score, balanced_accuracy_score, classification_report, confusion_matrix, \
-    f1_score, precision_score, recall_score, roc_auc_score
-
 from xgboost import XGBClassifier
 
 import dataPrep
-import plot_results
 
-PREDICTOR_FILE = dataPrep.DATA_DIR / "predictor_data.csv"
+PREDICTOR_FILE = dataPrep.PREDICTOR_FILE
+OUTPUT_DIR = "outputs"
+TARGET = dataPrep.OUTCOME  # DIGITAL_EXCLUSION: 1 = excluded (uses the Internet nowhere), 0 = user
+SEED = 42
 
+# ----------------------------------------------------------------------------------------------------
+# Inputs: ten predictor groups -> fifteen raw columns
+# ----------------------------------------------------------------------------------------------------
+# age and ordered codes (income bracket, education level) -> standardized
+NUMERIC_FEATURES = ["PRTAGE", "HEFAMINC", "PEEDUCA"]
 # nominal census codes (the number itself has no order, e.g. state FIPS) -> one-hot encoded
 CATEGORICAL_FEATURES = ["PESEX", "PTDTRACE", "PEMARITL", "HETENURE", "GESTFIPS", "PEMLR"]
+# disability type: six 0/1 flags (overlap preserved) -> passed through unchanged
+BINARY_FEATURES = list(dataPrep.DISABILITY_INDICATORS)
 
-# age and ordered codes (income bracket, education level) -> scaled
-NUMERIC_FEATURES = ["PRTAGE", "HEFAMINC", "PEEDUCA"]
+FEATURES = NUMERIC_FEATURES + CATEGORICAL_FEATURES + BINARY_FEATURES
 
-# disability type as six 0/1 indicators (a person can have several types) -> passed through unchanged
-DISABILITY_FEATURES = ["DIS_HEARING", "DIS_VISION", "DIS_COGNITIVE", "DIS_PHYSICAL", "DIS_SELFCARE", "DIS_INDLIVING"]
+# conceptual group of every raw column (used to aggregate importances back to the ten groups)
+FEATURE_GROUPS = {
+    "PRTAGE": "Age", "PESEX": "Sex", "PTDTRACE": "Race", "PEEDUCA": "Education", "HEFAMINC": "Family income",
+    "HETENURE": "Housing tenure", "PEMARITL": "Marital status", "PEMLR": "Employment status", "GESTFIPS": "State",
+    **{col: "Disability type" for col in BINARY_FEATURES},
+}
 
-# the ten predictors from the proposal: nine demographic/socioeconomic variables plus disability type
-FEATURES = NUMERIC_FEATURES + CATEGORICAL_FEATURES + DISABILITY_FEATURES
+# H3 reduced set, prespecified in the proposal: education, household income, age, disability type
+REDUCED_FEATURES = ["PRTAGE", "HEFAMINC", "PEEDUCA"] + BINARY_FEATURES
 
-# binary digital exclusion outcome (1 = does not use the internet at any location), built in dataPrep.py
-TARGET = dataPrep.TARGET_COLUMN
+# metadata that identifies records and groups but is never an input
+GROUP_COLUMNS = ["HRYEAR4", "HRHHID", "HRHHID2"]
+ID_COLUMNS = GROUP_COLUMNS + ["PULINENO"]
+INTERNET_COLUMNS = set(dataPrep.OUTCOME_SOURCE_COLUMNS) | {"INTERNET_USER"}
 
-# survey year column, used to train on earlier years and test on the latest one
-YEAR_COLUMN = "HRYEAR4"
-TEMPORAL_TRAIN_YEARS = [2019, 2021]
-TEMPORAL_TEST_YEAR = 2023
-
-# the six disability indicators are reported (and kept or dropped) together as one predictor
-DISABILITY_GROUP = "DISABILITY_TYPE"
-
-# number of top predictors kept in the reduced (parsimonious) model
-REDUCED_FEATURE_COUNT = 4
-
-# performance table and charts written by main()
-RESULTS_FILE = dataPrep.PROJECT_ROOT / "results" / "model_performance.csv"
-BASELINE_NAME = "Baseline (always connected)"
-
-# experiment labels used in the results table and charts
-RANDOM_EXPERIMENT = "Random split"
-TEMPORAL_EXPERIMENT = f"Train {TEMPORAL_TRAIN_YEARS[0]}+{TEMPORAL_TRAIN_YEARS[1]}, test {TEMPORAL_TEST_YEAR}"
-REDUCED_EXPERIMENT = f"Reduced ({REDUCED_FEATURE_COUNT} predictors)"
-
-# metric used both to tune hyperparameters and to pick the best model
-# (macro F1 weighs both classes equally, so predicting only the majority class scores poorly)
+# metric used to tune hyperparameters (macro F1 weighs both classes equally)
 SCORING = "f1_macro"
+TEST_FRACTION = 0.30
+SPLIT_FOLDS = 10  # 10 stratified group folds, 3 of them form the 30 percent test set
+
+# H1 accuracy targets from the proposal (percent), one per model
+H1_TARGETS = {"Logistic Regression": 78.3, "Decision Tree": 80.7, "Random Forest": 80.0, "XGBoost": 79.0}
+
+MODEL_ORDER = ["Dummy (majority)", "Logistic Regression", "Decision Tree", "Random Forest", "XGBoost"]
 
 
-# Preprocessing: fit on training folds only because it lives inside each model's Pipeline
-def build_preprocessor(features=FEATURES):
-    return ColumnTransformer([
-        ("num", StandardScaler(), [f for f in NUMERIC_FEATURES if f in features]),
-        ("cat", OneHotEncoder(handle_unknown="ignore", sparse_output=False),
-         [f for f in CATEGORICAL_FEATURES if f in features]),
-        ("dis", "passthrough", [f for f in DISABILITY_FEATURES if f in features]),
-    ])
+# ----------------------------------------------------------------------------------------------------
+# Preprocessing and models
+# ----------------------------------------------------------------------------------------------------
+
+def build_preprocessor(features=None):
+    """Fit on training folds only because it lives inside each model's Pipeline."""
+    features = FEATURES if features is None else features
+    numeric = [f for f in NUMERIC_FEATURES if f in features]
+    categorical = [f for f in CATEGORICAL_FEATURES if f in features]
+    binary = [f for f in BINARY_FEATURES if f in features]
+    transformers = []
+    if numeric:
+        transformers.append(("num", StandardScaler(), numeric))
+    if categorical:
+        transformers.append(("cat", OneHotEncoder(handle_unknown="ignore", sparse_output=False), categorical))
+    if binary:
+        transformers.append(("bin", "passthrough", binary))
+    return ColumnTransformer(transformers)
 
 
-# Each model with class-imbalance handling and a small hyperparameter grid
-def build_models(y_train):
+def build_models(y_train, quick=False, class_weighting=True):
+    """
+    Each classifier with a compact hyperparameter grid. With class_weighting (the protocol), the minority
+    class is up-weighted ("balanced", scale_pos_weight for XGBoost); without it (sensitivity experiment C)
+    the models are fit on raw labels.
+    """
     # XGBoost has no class_weight option; weight positives by the negative/positive ratio instead
-    pos_weight = (y_train == 0).sum() / max((y_train == 1).sum(), 1)
+    pos_weight = float((y_train == 0).sum() / max((y_train == 1).sum(), 1)) if class_weighting else 1.0
+    cw = "balanced" if class_weighting else None
 
-    return {
+    models = {
         "Logistic Regression": (
-            LogisticRegression(max_iter=1000, solver="liblinear", class_weight="balanced"),
+            LogisticRegression(max_iter=2000, solver="liblinear", class_weight=cw),
             {"model__C": [0.01, 0.1, 1, 10]},
         ),
         "Decision Tree": (
-            DecisionTreeClassifier(random_state=42, class_weight="balanced"),
+            DecisionTreeClassifier(random_state=SEED, class_weight=cw),
             {"model__max_depth": [3, 5, 8, 12], "model__min_samples_leaf": [1, 20, 50]},
         ),
         "Random Forest": (
-            RandomForestClassifier(n_estimators=200, random_state=42, class_weight="balanced"),
+            RandomForestClassifier(n_estimators=300, random_state=SEED, class_weight=cw, n_jobs=1),
             {"model__max_depth": [5, 10, None], "model__min_samples_leaf": [1, 5, 20]},
         ),
         "XGBoost": (
-            XGBClassifier(random_state=42, n_jobs=1, scale_pos_weight=pos_weight),
+            XGBClassifier(random_state=SEED, n_jobs=1, scale_pos_weight=pos_weight, eval_metric="logloss"),
             {"model__max_depth": [3, 5], "model__learning_rate": [0.05, 0.1], "model__n_estimators": [100, 300]},
         ),
     }
-
-
-# Tune each model with cross-validation on the training data only
-def fit_models(x_train, y_train, cv=5):
-    folds = StratifiedKFold(n_splits=cv, shuffle=True, random_state=42)
-    features = list(x_train.columns)
-
-    models = {}
-    for name, (estimator, param_grid) in build_models(y_train).items():
-        pipeline = Pipeline([("prep", build_preprocessor(features)), ("model", estimator)])
-        search = GridSearchCV(pipeline, param_grid, scoring=SCORING, cv=folds, n_jobs=-1)
-        search.fit(x_train, y_train)
-
-        models[name] = search.best_estimator_
-        train_acc = accuracy_score(y_train, search.best_estimator_.predict(x_train))
-        print(f"{name}: best params {search.best_params_}, CV {SCORING}={search.best_score_:.3f}, "
-              f"train accuracy={train_acc:.3f}")
-
-    print(" Model Training Complete")
+    if quick:  # smoke-test grids
+        models = {
+            "Logistic Regression": (models["Logistic Regression"][0], {"model__C": [1]}),
+            "Decision Tree": (models["Decision Tree"][0], {"model__max_depth": [5]}),
+            "Random Forest": (models["Random Forest"][0].set_params(n_estimators=50), {"model__max_depth": [10]}),
+            "XGBoost": (models["XGBoost"][0], {"model__max_depth": [3], "model__n_estimators": [100]}),
+        }
     return models
 
 
-# Random 70/30 split, stratified so train and test keep the same class ratio
-def train_models(df=None, target=TARGET, cv=5, features=FEATURES):
+# ----------------------------------------------------------------------------------------------------
+# Splits
+# ----------------------------------------------------------------------------------------------------
 
-    # read in data
-    if df is None:
-        df = pd.read_csv(PREDICTOR_FILE)
-
-    x = df[features]
-    y = df[target]  # Target variable
-
-    x_train, x_test, y_train, y_test = train_test_split(x, y, test_size=0.3, random_state=42, stratify=y)
-    models = fit_models(x_train, y_train, cv=cv)
-    return models, x_train, x_test, y_train, y_test
+def make_group_key(df):
+    """Household key. Year is included so identical household ids in different years never merge."""
+    return df["HRYEAR4"].astype(str) + "_" + df["HRHHID"].astype(str) + "_" + df["HRHHID2"].astype(str)
 
 
-# Temporal check: train on earlier survey years, test on the latest one
-def train_models_temporal(df=None, target=TARGET, cv=5, features=FEATURES):
-    if df is None:
-        df = pd.read_csv(PREDICTOR_FILE)
-
-    train = df[df[YEAR_COLUMN].isin(TEMPORAL_TRAIN_YEARS)]
-    test = df[df[YEAR_COLUMN] == TEMPORAL_TEST_YEAR]
-
-    x_train, y_train = train[features], train[target]
-    x_test, y_test = test[features], test[target]
-    models = fit_models(x_train, y_train, cv=cv)
-    return models, x_train, x_test, y_train, y_test
-
-
-# map a transformed column name (e.g. "cat__GESTFIPS_6") back to the predictor it came from
-def source_feature(column_name):
-    block, name = column_name.split("__", 1)
-    if block == "dis":
-        return DISABILITY_GROUP
-    if block == "cat":
-        return next(f for f in CATEGORICAL_FEATURES if name.startswith(f + "_"))
-    return name
+def pooled_split(df, test_fraction=TEST_FRACTION, n_folds=SPLIT_FOLDS, seed=SEED):
+    """
+    Outcome-stratified train/test split that keeps household members on the same side.
+    Builds n_folds stratified group folds and assigns round(test_fraction * n_folds) of them to the test
+    set, so the realized test share is close to (but not exactly) the target. The realized proportions
+    are reported in run_manifest.json.
+    """
+    groups = make_group_key(df)
+    splitter = StratifiedGroupKFold(n_splits=n_folds, shuffle=True, random_state=seed)
+    folds = list(splitter.split(df, df[TARGET], groups))
+    n_test_folds = int(round(test_fraction * n_folds))
+    test_idx = np.sort(np.concatenate([folds[i][1] for i in range(n_test_folds)]))
+    train_mask = np.ones(len(df), dtype=bool)
+    train_mask[test_idx] = False
+    return df[train_mask].copy(), df.iloc[test_idx].copy()
 
 
-# Feature importance per predictor: |coefficient| for logistic regression, impurity/gain importance for trees.
-# Each model's scores are normalized to sum to 1, then one-hot columns are summed back to their predictor.
-def feature_importance(models):
-    table = {}
-    for name, pipeline in models.items():
-        model = pipeline.named_steps["model"]
-        if hasattr(model, "coef_"):
-            scores = abs(model.coef_[0])
-        else:
-            scores = model.feature_importances_
-        columns = pipeline.named_steps["prep"].get_feature_names_out()
-        scores = pd.Series(scores, index=[source_feature(c) for c in columns])
-        scores = scores.groupby(level=0).sum()
-        table[name] = scores / scores.sum() if scores.sum() > 0 else scores
-
-    importance = pd.DataFrame(table)
-    importance["Mean"] = importance.mean(axis=1)
-    return importance.sort_values("Mean", ascending=False)
+def temporal_split(df, dev_years=(2019, 2021), test_year=2023):
+    dev = df[df["HRYEAR4"].isin(dev_years)].copy()
+    test = df[df["HRYEAR4"] == test_year].copy()
+    return dev, test
 
 
-# expand predictor names (DISABILITY_TYPE -> the six indicators) into model input columns
-def expand_features(predictors):
-    columns = []
-    for p in predictors:
-        columns += DISABILITY_FEATURES if p == DISABILITY_GROUP else [p]
-    return columns
+def cv_folds(train_df, k=5, seed=SEED):
+    """Identical stratified, household-grouped folds for every model."""
+    splitter = StratifiedGroupKFold(n_splits=k, shuffle=True, random_state=seed)
+    return list(splitter.split(train_df, train_df[TARGET], make_group_key(train_df)))
 
 
-# score one set of predictions against the real answers in the test set
-def compute_metrics(name, y_test, y_pred, probabilities):
+def check_disjoint_groups(train_df, test_df):
+    overlap = set(make_group_key(train_df)) & set(make_group_key(test_df))
+    assert not overlap, f"{len(overlap)} households appear in both training and test data"
+    return True
+
+
+# ----------------------------------------------------------------------------------------------------
+# Training and evaluation
+# ----------------------------------------------------------------------------------------------------
+
+def train_models(train_df, folds, features=None, quick=False, verbose=True, scoring=SCORING,
+                 class_weighting=True):
+    """Tune each model with GridSearchCV on the shared folds; return fitted searches and a CV summary."""
+    features = FEATURES if features is None else features
+    x_train, y_train = train_df[features], train_df[TARGET]
+
+    searches, cv_rows, fold_rows = {}, [], []
+    for name, (estimator, grid) in build_models(y_train, quick, class_weighting).items():
+        t0 = time.time()
+        pipeline = Pipeline([("prep", build_preprocessor(features)), ("model", estimator)])
+        search = GridSearchCV(pipeline, grid, scoring=scoring, cv=folds, n_jobs=-1, refit=True,
+                              return_train_score=True)
+        search.fit(x_train, y_train)
+        searches[name] = search
+
+        res = search.cv_results_
+        best = search.best_index_
+        cv_rows.append({
+            "Model": name, "Best Params": json.dumps(search.best_params_),
+            f"CV {scoring} mean": round(float(res["mean_test_score"][best]), 4),
+            f"CV {scoring} std": round(float(res["std_test_score"][best]), 4),
+            f"CV train {scoring} mean": round(float(res["mean_train_score"][best]), 4),
+            "Candidates": int(len(res["params"])), "Fit seconds": round(time.time() - t0, 1),
+        })
+        for i in range(len(folds)):
+            fold_rows.append({"Model": name, "Fold": i, f"val {scoring}": float(res[f"split{i}_test_score"][best]),
+                              f"train {scoring}": float(res[f"split{i}_train_score"][best])})
+        if verbose:
+            print(f"  {name}: best {search.best_params_}  CV {scoring}={search.best_score_:.3f}  "
+                  f"({cv_rows[-1]['Fit seconds']}s)")
+
+    # Majority-class dummy fitted on training labels only
+    dummy = DummyClassifier(strategy="most_frequent").fit(x_train, y_train)
+    if verbose:
+        print("  Model training complete")
+    return searches, dummy, pd.DataFrame(cv_rows), pd.DataFrame(fold_rows)
+
+
+def metrics_for(name, y_true, y_pred, y_prob):
+    cm = confusion_matrix(y_true, y_pred, labels=[0, 1])
     return {
         "Model": name,
-        "Accuracy": accuracy_score(y_test, y_pred),
-        "Balanced Accuracy": balanced_accuracy_score(y_test, y_pred),
-        "Macro F1": f1_score(y_test, y_pred, average="macro"),
-        "F1 Score": f1_score(y_test, y_pred, zero_division=0),
-        "Recall": recall_score(y_test, y_pred, zero_division=0),
-        "Precision": precision_score(y_test, y_pred, zero_division=0),
-        "ROC AUC": roc_auc_score(y_test, probabilities),
-        "Confusion Matrix": confusion_matrix(y_test, y_pred, labels=[0, 1]),
-        "Classification Report": classification_report(y_test, y_pred, zero_division=0),
+        "Accuracy": accuracy_score(y_true, y_pred),
+        "Balanced Accuracy": balanced_accuracy_score(y_true, y_pred),
+        "Precision (excluded)": precision_score(y_true, y_pred, zero_division=0),
+        "Recall (excluded)": recall_score(y_true, y_pred, zero_division=0),
+        "F1 (excluded)": f1_score(y_true, y_pred, zero_division=0),
+        "Macro F1": f1_score(y_true, y_pred, average="macro"),
+        "ROC AUC": roc_auc_score(y_true, y_prob) if len(np.unique(y_prob)) > 1 else 0.5,
+        "TN": int(cm[0, 0]), "FP": int(cm[0, 1]), "FN": int(cm[1, 0]), "TP": int(cm[1, 1]),
+        "Confusion Matrix": cm,
+        "Classification Report": classification_report(y_true, y_pred, target_names=["user", "excluded"],
+                                                       zero_division=0),
     }
 
 
-# confusion matrix in plain words: rows are the real answer, columns are the model's prediction
-def format_confusion_matrix(cm):
-    (tn, fp), (fn, tp) = cm
-    total = tn + fp + fn + tp
-    return "\n".join([
-        f"Predicted vs actual (test set, n={total}):",
-        f"{'':22}{'Predicted connected':>22}{'Predicted excluded':>24}",
-        f"{'Actually connected':22}{f'{tn} (correct)':>22}{f'{fp} (false alarm)':>24}",
-        f"{'Actually excluded':22}{f'{fn} (missed)':>22}{f'{tp} (correct)':>24}",
-        f"Overall accuracy: {tn + tp} / {total} = {(tn + tp) / total:.3f}",
-    ])
+def test_models(searches, dummy, test_df, features=None, verbose=True):
+    """Score every tuned model and the dummy on the same held-out records."""
+    features = FEATURES if features is None else features
+    x_test, y_test = test_df[features], test_df[TARGET]
 
-
-def test_models(models, x_test, y_test):
     results = []
-
-    for name, model in models.items():
+    predictions = test_df[ID_COLUMNS + [TARGET]].copy()
+    y_dummy = dummy.predict(x_test)
+    results.append(metrics_for("Dummy (majority)", y_test, y_dummy, dummy.predict_proba(x_test)[:, 1]))
+    predictions["pred_Dummy"] = y_dummy
+    for name, search in searches.items():
+        model = search.best_estimator_
         y_pred = model.predict(x_test)
-        probabilities = model.predict_proba(x_test)[:, 1]  # Probability of the positive class
-        results.append(compute_metrics(name, y_test, y_pred, probabilities))
+        y_prob = model.predict_proba(x_test)[:, 1]
+        results.append(metrics_for(name, y_test, y_pred, y_prob))
+        key = name.replace(" ", "_")
+        predictions[f"pred_{key}"] = y_pred
+        predictions[f"prob_{key}"] = np.round(y_prob, 5)
 
-    print(" Model Testing Complete. Initiating Model Comparison...\n\n")
-
-    # Majority-class baseline: a useful model has to beat this
-    majority = int(y_test.mode()[0])
-    baseline_pred = pd.Series(majority, index=y_test.index)
-    baseline = compute_metrics(BASELINE_NAME, y_test, baseline_pred, baseline_pred.astype(float))
-
-    # Compare models by macro F1 (the baseline is reported but never picked as best)
-    best_model = max(results, key=lambda r: r["Macro F1"])
-
-    print("Model Comparison:")
-    for r in [baseline] + results:
-        print(f"{r['Model']}: Accuracy={r['Accuracy']:.3f}, Balanced Acc={r['Balanced Accuracy']:.3f}, "
-              f"Macro F1={r['Macro F1']:.3f}, AUC={r['ROC AUC']:.3f}")
-
-    print(f"\nBest model: {best_model['Model']} with Macro F1={best_model['Macro F1']:.3f}")
-    print(best_model["Classification Report"])
-    print(format_confusion_matrix(best_model["Confusion Matrix"]))
-
-    results.append(baseline)
-    return results, best_model
+    if verbose:
+        print("  Model testing complete\n")
+        print("  Model comparison on held-out records:")
+        for r in results:
+            print(f"    {r['Model']:<20} Acc={r['Accuracy']:.3f}  BalAcc={r['Balanced Accuracy']:.3f}  "
+                  f"Prec={r['Precision (excluded)']:.3f}  Rec={r['Recall (excluded)']:.3f}  "
+                  f"F1={r['F1 (excluded)']:.3f}  MacroF1={r['Macro F1']:.3f}  AUC={r['ROC AUC']:.3f}")
+    return results, predictions
 
 
-# one CSV-ready row per model (and the baseline) for one experiment
-def results_table(results, experiment):
+# ----------------------------------------------------------------------------------------------------
+# Interpretation
+# ----------------------------------------------------------------------------------------------------
+
+def logistic_coefficients(search, train_df, features=None):
+    """
+    Coefficients of the tuned logistic regression on the encoded design matrix.
+    Numeric inputs are standardized, so 'coef' is the change in log odds of exclusion per one standard
+    deviation; 'coef_per_unit' divides by the training SD to give the change per raw unit (per year of age,
+    per income bracket, per education code). Categorical inputs are fully one-hot encoded (no dropped
+    level) with L2 regularization, so each category coefficient is relative to the regularized average;
+    'coef_vs_reference' re-expresses it against the most frequent training category of that variable.
+    Disability flags are 0/1, so the coefficient is the log odds change for having that difficulty.
+    """
+    features = FEATURES if features is None else features
+    pipe = search.best_estimator_
+    prep, model = pipe.named_steps["prep"], pipe.named_steps["model"]
+    names = prep.get_feature_names_out()
+    coefs = model.coef_.ravel()
     rows = []
+    numeric = [f for f in NUMERIC_FEATURES if f in features]
+    scaler = prep.named_transformers_["num"] if numeric else None
+    for n, c in zip(names, coefs):
+        kind, raw = n.split("__", 1)
+        if kind == "num":
+            sd = float(scaler.scale_[numeric.index(raw)])
+            rows.append({"input": raw, "category": "", "group": FEATURE_GROUPS[raw], "coef": c,
+                         "coef_per_unit": c / sd if sd else np.nan, "coef_vs_reference": np.nan,
+                         "unit": "per 1 SD (coef) / per raw unit (coef_per_unit)"})
+        elif kind == "cat":
+            var, cat = raw.rsplit("_", 1)
+            rows.append({"input": var, "category": cat, "group": FEATURE_GROUPS[var], "coef": c,
+                         "coef_per_unit": np.nan, "coef_vs_reference": np.nan, "unit": "category vs average"})
+        else:
+            rows.append({"input": raw, "category": "1 = has difficulty", "group": FEATURE_GROUPS[raw], "coef": c,
+                         "coef_per_unit": c, "coef_vs_reference": np.nan, "unit": "0/1 flag"})
+    table = pd.DataFrame(rows)
+    # contrast each category against the most frequent training category of the same variable
+    for var in [f for f in CATEGORICAL_FEATURES if f in features]:
+        ref = str(train_df[var].mode().iloc[0])
+        mask = table["input"] == var
+        ref_row = table[mask & (table["category"] == ref)]
+        if len(ref_row):
+            table.loc[mask, "coef_vs_reference"] = table.loc[mask, "coef"] - float(ref_row["coef"].iloc[0])
+            table.loc[mask, "unit"] = f"category vs reference {var}={ref}"
+    table["odds_ratio"] = np.exp(table["coef"])
+    table["intercept"] = float(model.intercept_[0])
+    return table.sort_values("coef", key=np.abs, ascending=False).reset_index(drop=True)
+
+
+def tree_importances(searches, features=None):
+    """Impurity (DT, RF) and gain (XGB) importances aggregated from encoded columns back to raw inputs/groups."""
+    features = FEATURES if features is None else features
+    rows = []
+    for name in ["Decision Tree", "Random Forest", "XGBoost"]:
+        if name not in searches:
+            continue
+        pipe = searches[name].best_estimator_
+        prep, model = pipe.named_steps["prep"], pipe.named_steps["model"]
+        names = prep.get_feature_names_out()
+        imp = np.asarray(model.feature_importances_, dtype=float)
+        agg = {}
+        for n, v in zip(names, imp):
+            kind, raw = n.split("__", 1)
+            var = raw.rsplit("_", 1)[0] if kind == "cat" else raw
+            agg[var] = agg.get(var, 0.0) + float(v)
+        for var, v in agg.items():
+            rows.append({"Model": name, "input": var, "group": FEATURE_GROUPS.get(var, var), "importance": v})
+    table = pd.DataFrame(rows)
+    if len(table):
+        table["group_importance"] = table.groupby(["Model", "group"])["importance"].transform("sum")
+        table = table.sort_values(["Model", "importance"], ascending=[True, False]).reset_index(drop=True)
+    return table
+
+
+def permutation_importances(searches, test_df, features=None, n_repeats=10, seed=SEED):
+    """
+    Permutation importance on the held-out records, computed on the raw input columns so each conceptual
+    input (e.g. state as one column) gets one score. Post-hoc interpretation only: nothing here is used
+    to choose models or parameters. Importance is predictive contribution, not causal effect.
+    """
+    features = FEATURES if features is None else features
+    x_test, y_test = test_df[features], test_df[TARGET]
+    rows = []
+    for name, search in searches.items():
+        pi = permutation_importance(search.best_estimator_, x_test, y_test, scoring=SCORING,
+                                    n_repeats=n_repeats, random_state=seed, n_jobs=-1)
+        for f, m, s in zip(features, pi.importances_mean, pi.importances_std):
+            rows.append({"Model": name, "input": f, "group": FEATURE_GROUPS[f],
+                         f"mean drop in {SCORING}": float(m), "std": float(s)})
+    table = pd.DataFrame(rows)
+    return table.sort_values(["Model", f"mean drop in {SCORING}"], ascending=[True, False]).reset_index(drop=True)
+
+
+# ----------------------------------------------------------------------------------------------------
+# Hypotheses
+# ----------------------------------------------------------------------------------------------------
+
+def evaluate_hypotheses(results):
+    """H1 accuracy targets and H2 ensemble ordering, judged on the held-out results of one experiment."""
+    by_name = {r["Model"]: r for r in results}
+    rows = []
+    for model, target in H1_TARGETS.items():
+        if model in by_name:
+            acc = 100 * by_name[model]["Accuracy"]
+            rows.append({"Hypothesis": "H1", "Model": model, "Metric": "Accuracy (%)", "Value": round(acc, 2),
+                         "Target": target, "Met": bool(acc >= target)})
+    h1_any = any(r["Met"] for r in rows)
+    rows.append({"Hypothesis": "H1", "Model": "any model", "Metric": "at least one target met", "Value": h1_any,
+                 "Target": True, "Met": h1_any})
+    for metric in ["Accuracy", "Macro F1", "ROC AUC"]:
+        ens = [by_name[m][metric] for m in ["Random Forest", "XGBoost"] if m in by_name]
+        single = [by_name[m][metric] for m in ["Logistic Regression", "Decision Tree"] if m in by_name]
+        if ens and single:
+            holds = min(ens) > max(single)
+            rows.append({"Hypothesis": "H2", "Model": "RF & XGB vs LR & DT", "Metric": metric,
+                         "Value": f"ensembles {min(ens):.4f}-{max(ens):.4f} vs singles {min(single):.4f}-{max(single):.4f}",
+                         "Target": "both ensembles above both single models", "Met": bool(holds)})
+    return pd.DataFrame(rows)
+
+
+# ----------------------------------------------------------------------------------------------------
+# Experiment runner
+# ----------------------------------------------------------------------------------------------------
+
+def save_results(outdir, results, predictions, cv_summary, cv_fold_table, searches, extras, manifest):
+    os.makedirs(outdir, exist_ok=True)
+    comparison = pd.DataFrame([{k: v for k, v in r.items() if k not in ("Confusion Matrix", "Classification Report")}
+                               for r in results])
+    comparison.to_csv(os.path.join(outdir, "model_comparison.csv"), index=False)
+    predictions.to_csv(os.path.join(outdir, "test_predictions.csv"), index=False)
+    cv_summary.to_csv(os.path.join(outdir, "cv_summary.csv"), index=False)
+    cv_fold_table.to_csv(os.path.join(outdir, "cv_folds.csv"), index=False)
+    with open(os.path.join(outdir, "best_params.json"), "w") as f:
+        json.dump({name: s.best_params_ for name, s in searches.items()}, f, indent=2)
+    cm_rows = []
     for r in results:
-        (tn, fp), (fn, tp) = r["Confusion Matrix"]
-        rows.append({
-            "Experiment": experiment,
-            "Model": r["Model"],
-            "Test Size": int(tn + fp + fn + tp),
-            "Accuracy": r["Accuracy"],
-            "Balanced Accuracy": r["Balanced Accuracy"],
-            "Precision": r["Precision"],
-            "Recall": r["Recall"],
-            "F1 (excluded)": r["F1 Score"],
-            "Macro F1": r["Macro F1"],
-            "ROC AUC": r["ROC AUC"],
-            "Correct Connected (TN)": int(tn),
-            "False Alarms (FP)": int(fp),
-            "Missed Excluded (FN)": int(fn),
-            "Correct Excluded (TP)": int(tp),
-        })
-    return pd.DataFrame(rows).round(3)
+        for true_label, pred_label, n in [("user", "user", r["TN"]), ("user", "excluded", r["FP"]),
+                                          ("excluded", "user", r["FN"]), ("excluded", "excluded", r["TP"])]:
+            cm_rows.append({"Model": r["Model"], "true": true_label, "predicted": pred_label, "count": n})
+    pd.DataFrame(cm_rows).to_csv(os.path.join(outdir, "confusion_matrices.csv"), index=False)
+    with open(os.path.join(outdir, "classification_reports.txt"), "w") as f:
+        for r in results:
+            f.write(f"===== {r['Model']} =====\n{r['Classification Report']}\n"
+                    f"Confusion matrix [[TN FP] [FN TP]]:\n{r['Confusion Matrix']}\n\n")
+    for key, table in extras.items():
+        if table is not None and len(table):
+            table.to_csv(os.path.join(outdir, f"{key}.csv"), index=False)
+    with open(os.path.join(outdir, "run_manifest.json"), "w") as f:
+        json.dump(manifest, f, indent=2, default=str)
 
 
-def save_results(df, path=None):
-    path = path or RESULTS_FILE
-    Path(path).parent.mkdir(parents=True, exist_ok=True)
-    df.to_csv(path, index=False)
-    print(f"\nSaved model performance table to {path}")
-
-
-def summarize(label, results, best_model):
+def base_manifest(name, description, features, cv, quick, scoring=SCORING, class_weighting=True):
     return {
-        "Experiment": label,
-        "Best Model": best_model["Model"],
-        "Macro F1": round(best_model["Macro F1"], 3),
-        "Balanced Accuracy": round(best_model["Balanced Accuracy"], 3),
-        "Recall": round(best_model["Recall"], 3),
-        "ROC AUC": round(best_model["ROC AUC"], 3),
+        "experiment": name, "description": description,
+        "protocol_experiment": bool(scoring == SCORING and class_weighting),
+        "timestamp_utc": datetime.now(timezone.utc).isoformat(),
+        "python": sys.version.split()[0], "platform": platform.platform(),
+        "pandas": pd.__version__, "numpy": np.__version__, "scikit-learn": sklearn.__version__,
+        "xgboost": xgboost.__version__,
+        "seed": SEED, "scoring": scoring, "class_weighting": class_weighting, "cv_folds": cv, "quick_grids": quick,
+        "target": TARGET, "features": list(features),
+        "feature_groups": sorted(set(FEATURE_GROUPS[f] for f in features)),
+        "internet_fields_in_inputs": sorted(set(features) & INTERNET_COLUMNS),
+        "frozen_before_test_evaluation": ["model families", "hyperparameter grids", "outcome rule", "scoring rule",
+                                          "cohort rule", "split procedure"],
     }
 
 
-def main():
+def describe(df):
+    return {"n": int(len(df)), "excluded": int(df[TARGET].sum()), "exclusion_rate": round(float(df[TARGET].mean()), 4),
+            "households": int(make_group_key(df).nunique()),
+            "years": {int(k): int(v) for k, v in df["HRYEAR4"].value_counts().sort_index().items()}}
 
-    # Step 1: Data Preparation (skipped when the predictor file already exists; delete it to rebuild)
-    if not Path(PREDICTOR_FILE).exists():
+
+def run_experiment(name, train_df, test_df, outdir, description, features=None, cv=5, quick=False,
+                   interpret=True, verbose=True, scoring=SCORING, class_weighting=True):
+    features = FEATURES if features is None else features
+    assert TARGET not in features and not (set(features) & INTERNET_COLUMNS), "outcome fields found in inputs"
+    check_disjoint_groups(train_df, test_df)
+    folds = cv_folds(train_df, k=cv)
+
+    if verbose:
+        print(f"\n===== Experiment {name}: {description} =====")
+        print(f"  train/dev: {describe(train_df)}")
+        print(f"  test:      {describe(test_df)}")
+
+    searches, dummy, cv_summary, cv_fold_table = train_models(train_df, folds, features, quick, verbose,
+                                                              scoring, class_weighting)
+    results, predictions = test_models(searches, dummy, test_df, features, verbose)
+    hypotheses = evaluate_hypotheses(results)
+
+    extras = {"hypotheses": hypotheses}
+    if interpret:
+        extras["logistic_coefficients"] = logistic_coefficients(searches["Logistic Regression"], train_df, features)
+        extras["tree_importances"] = tree_importances(searches, features)
+        extras["permutation_importance"] = permutation_importances(searches, test_df, features)
+
+    manifest = base_manifest(name, description, features, cv, quick, scoring, class_weighting)
+    manifest.update({"train": describe(train_df), "test": describe(test_df),
+                     "realized_test_fraction": round(len(test_df) / (len(test_df) + len(train_df)), 4),
+                     "grids": {n: g for n, (_, g) in build_models(train_df[TARGET], quick, class_weighting).items()},
+                     "best_params": {n: s.best_params_ for n, s in searches.items()}})
+    save_results(outdir, results, predictions, cv_summary, cv_fold_table, searches, extras, manifest)
+    if verbose:
+        print(f"\n  Hypotheses:\n{hypotheses.to_string(index=False)}")
+        print(f"  Saved results to {outdir}/")
+    return results, searches
+
+
+def load_predictor_table():
+    if not os.path.exists(PREDICTOR_FILE):
         if dataPrep.main() is None:
             return None
-
     df = pd.read_csv(PREDICTOR_FILE)
-    print(f"Population: {len(df)} adults 65+ with a disability; "
-          f"digitally excluded rate = {df[TARGET].mean():.3f}")
-    summary = []
-    tables = []
+    missing = [c for c in FEATURES + [TARGET] + ID_COLUMNS if c not in df.columns]
+    if missing:
+        raise ValueError(f"{PREDICTOR_FILE} is missing {missing}; delete it and rerun dataPrep.py to rebuild")
+    leaked = sorted(set(df.columns) & INTERNET_COLUMNS)
+    if leaked:
+        raise ValueError(f"{PREDICTOR_FILE} contains internet-use fields {leaked}; rebuild it with dataPrep.py")
+    return df
 
-    # Step 2 + 3: train and test on a random stratified 70/30 split
-    print("\n===== Experiment: random 70/30 split, all ten predictors =====")
-    models, _, x_test, _, y_test = train_models(df)
-    results, best_model = test_models(models, x_test, y_test)
-    summary.append(summarize(RANDOM_EXPERIMENT, results, best_model))
-    tables.append(results_table(results, RANDOM_EXPERIMENT))
 
-    # Step 4: temporal check, train on 2019 + 2021 and test on 2023
-    if YEAR_COLUMN in df.columns:
-        print(f"\n===== Experiment: train on {TEMPORAL_TRAIN_YEARS}, test on {TEMPORAL_TEST_YEAR} =====")
-        t_models, _, t_x_test, _, t_y_test = train_models_temporal(df)
-        t_results, t_best = test_models(t_models, t_x_test, t_y_test)
-        summary.append(summarize(TEMPORAL_EXPERIMENT, t_results, t_best))
-        tables.append(results_table(t_results, TEMPORAL_EXPERIMENT))
+def main(experiment="both", cv=5, quick=False, outdir=OUTPUT_DIR, verbose=True):
+    df = load_predictor_table()
+    if df is None:
+        return None
+    summary = {}
 
-    # Step 5: which predictors matter most
-    importance = feature_importance(models)
-    print("\n===== Feature importance (normalized, grouped by predictor) =====")
-    print(importance.round(3).to_string())
+    # Experiment B first: the temporal evaluation is run before pooled results exist, so nothing from the
+    # pooled comparison can influence the frozen temporal setup.
+    if experiment in ("both", "B"):
+        dev, test = temporal_split(df)
+        results, _ = run_experiment(
+            "B_temporal", dev, test, os.path.join(outdir, "B_temporal"),
+            "develop and tune on 2019+2021 (household-grouped stratified CV), refit on all development records, "
+            "evaluate once on 2023", cv=cv, quick=quick, verbose=verbose)
+        summary["B_temporal"] = results
 
-    # Step 6: parsimonious model on the top predictors only
-    top = list(importance.index[:REDUCED_FEATURE_COUNT])
-    print(f"\n===== Experiment: reduced model with top {REDUCED_FEATURE_COUNT} predictors {top} =====")
-    r_models, _, r_x_test, _, r_y_test = train_models(df, features=expand_features(top))
-    r_results, r_best = test_models(r_models, r_x_test, r_y_test)
-    summary.append(summarize(REDUCED_EXPERIMENT, r_results, r_best))
-    tables.append(results_table(r_results, REDUCED_EXPERIMENT))
+    if experiment in ("both", "A"):
+        train, test = pooled_split(df)
+        results, _ = run_experiment(
+            "A_pooled", train, test, os.path.join(outdir, "A_pooled"),
+            "pooled 2019+2021+2023, outcome-stratified ~70/30 split keeping households together, "
+            "household-grouped stratified CV inside training", cv=cv, quick=quick, verbose=verbose)
+        summary["A_pooled"] = results
 
-    summary = pd.DataFrame(summary)
-    print("\n===== Summary: best model per experiment =====")
-    print(summary.to_string(index=False))
+    # Sensitivity experiment C (not part of the protocol, never a headline): the pooled split again, but with
+    # no class weighting and tuning on plain accuracy. It shows what the models do when accuracy alone is
+    # rewarded: accuracy rises a little and recall for the excluded class falls sharply.
+    if experiment == "C":
+        train, test = pooled_split(df)
+        results, _ = run_experiment(
+            "C_accuracy_tuned", train, test, os.path.join(outdir, "C_accuracy_tuned"),
+            "sensitivity: same pooled household-grouped split as A, unweighted classes, tuned on accuracy",
+            cv=cv, quick=quick, verbose=verbose, interpret=False, scoring="accuracy", class_weighting=False)
+        summary["C_accuracy_tuned"] = results
 
-    # Step 7: save the performance table and draw the charts from it
-    save_results(pd.concat(tables, ignore_index=True), RESULTS_FILE)
-    plot_results.main(RESULTS_FILE)
+    if verbose:
+        print("\n===== Summary: held-out accuracy / macro F1 / ROC AUC =====")
+        for exp, results in summary.items():
+            for r in results:
+                print(f"  {exp:<11} {r['Model']:<20} {r['Accuracy']:.3f} / {r['Macro F1']:.3f} / {r['ROC AUC']:.3f}")
     return summary
 
 
 if __name__ == "__main__":
-    main()
+    parser = argparse.ArgumentParser(description="Run the digital exclusion experiments.")
+    parser.add_argument("--experiment", choices=["both", "A", "B", "C"], default="both",
+                        help="both = protocol experiments B then A; C = accuracy-tuned sensitivity run")
+    parser.add_argument("--cv", type=int, default=5, help="k for the training-only cross-validation")
+    parser.add_argument("--quick", action="store_true", help="tiny grids for a smoke test")
+    parser.add_argument("--outdir", default=OUTPUT_DIR)
+    args = parser.parse_args()
+    main(args.experiment, args.cv, args.quick, args.outdir)
