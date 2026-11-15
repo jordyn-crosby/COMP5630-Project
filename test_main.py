@@ -28,6 +28,11 @@ def make_df(n=200, seed=0):
         "HETENURE": rng.integers(1, 4, n),
         "GESTFIPS": rng.choice([1, 6, 36, 48], n),
         "PEMLR": rng.integers(1, 8, n),
+        "HRNUMHOU": rng.integers(1, 6, n),
+        "PRNMCHLD": rng.integers(0, 2, n),
+        "GTMETSTA": rng.integers(1, 4, n),
+        "PEAFEVER": rng.integers(1, 3, n),
+        "PRCITSHP": rng.integers(1, 6, n),
     })
     for col in main.DISABILITY_FEATURES:
         df[col] = rng.integers(0, 2, n)
@@ -69,6 +74,23 @@ class TestTrainModels(unittest.TestCase):
         x["GESTFIPS"] = 99  # state code never seen during training
         for model in self.models.values():
             model.predict(x)
+
+    def test_extended_features_stay_out_of_the_ten_predictors(self):
+        self.assertEqual(len(main.EXTENDED_FEATURES), 5)
+        self.assertFalse(set(main.EXTENDED_FEATURES) & set(main.FEATURES))
+
+
+class TestExtendedModel(unittest.TestCase):
+
+    def test_trains_on_ten_predictors_plus_extended(self):
+        features = main.FEATURES + main.EXTENDED_FEATURES
+        with mock.patch("builtins.print"):
+            models, x_train, x_test, _, _ = main.train_models(make_df(), cv=2, features=features)
+        self.assertEqual(list(x_train.columns), features)
+        prep = models["Logistic Regression"].named_steps["prep"]
+        self.assertEqual(prep.transformers_[0][2], main.NUMERIC_FEATURES + main.EXTENDED_NUMERIC_FEATURES)
+        self.assertEqual(prep.transformers_[1][2], main.CATEGORICAL_FEATURES + main.EXTENDED_CATEGORICAL_FEATURES)
+        self.assertEqual(len(models["XGBoost"].predict(x_test)), len(x_test))
 
 
 class TestTemporalSplit(unittest.TestCase):
@@ -200,10 +222,10 @@ class TestMain(unittest.TestCase):
         prep.assert_not_called()
         self.assertEqual(summary["Experiment"].tolist(),
                          [main.RANDOM_EXPERIMENT, main.ACCURACY_EXPERIMENT, main.TEMPORAL_EXPERIMENT,
-                          main.REDUCED_EXPERIMENT])
+                          main.REDUCED_EXPERIMENT, main.EXTENDED_EXPERIMENT])
 
         table = pd.read_csv(main.RESULTS_FILE)
-        self.assertEqual(len(table), 20)  # 4 experiments x (4 models + baseline)
+        self.assertEqual(len(table), 25)  # 5 experiments x (4 models + baseline)
         self.assertTrue(os.path.getsize("results/model_performance.png") > 0)
         self.assertTrue(os.path.getsize("results/confusion_matrix.png") > 0)
 

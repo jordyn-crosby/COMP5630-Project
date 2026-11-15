@@ -105,6 +105,11 @@ def feature_selection(df):
         "GESTFIPS",  # state
         "PEMLR",     # employment status
         "DISTYPE",
+        "HRNUMHOU",  # household size        } extended predictors: only used in the separate
+        "PRNMCHLD",  # own children under 18 } "Extended" experiment, so the original ten
+        "GTMETSTA",  # metropolitan status   } stay the main result
+        "PEAFEVER",  # veteran status        }
+        "PRCITSHP",  # citizenship           }
         "HRYEAR4",   # survey year: not a predictor, used for the train-on-earlier/test-on-2023 check
         TARGET_COLUMN,
     ] + indicator_columns

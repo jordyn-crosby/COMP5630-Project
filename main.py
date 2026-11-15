@@ -2,7 +2,8 @@
 # The purpose of this file is to run all phases of the experiment
 # including data preparation, model training, and model testing. It predicts digital exclusion
 # (no internet use at any location) among adults 65+ with a disability, compares four models,
-# checks performance across survey years, ranks feature importance, and tests a reduced feature set.
+# checks performance across survey years, ranks feature importance, tests a reduced feature set, and tests an
+# extended feature set with five extra household/geography predictors.
 
 from pathlib import Path
 
@@ -40,6 +41,11 @@ DISABILITY_FEATURES = ["DIS_HEARING", "DIS_VISION", "DIS_COGNITIVE", "DIS_PHYSIC
 # the ten predictors from the proposal: nine demographic/socioeconomic variables plus disability type
 FEATURES = NUMERIC_FEATURES + CATEGORICAL_FEATURES + DISABILITY_FEATURES
 
+# extra non-behavioral predictors, used only in the separate "Extended" experiment
+EXTENDED_NUMERIC_FEATURES = ["HRNUMHOU", "PRNMCHLD"]  # household size, own children under 18
+EXTENDED_CATEGORICAL_FEATURES = ["GTMETSTA", "PEAFEVER", "PRCITSHP"]  # metro status, veteran status, citizenship
+EXTENDED_FEATURES = EXTENDED_NUMERIC_FEATURES + EXTENDED_CATEGORICAL_FEATURES
+
 # binary digital exclusion outcome (1 = does not use the internet at any location), built in dataPrep.py
 TARGET = dataPrep.TARGET_COLUMN
 
@@ -63,6 +69,7 @@ RANDOM_EXPERIMENT = "Random split"
 TEMPORAL_EXPERIMENT = f"Train {TEMPORAL_TRAIN_YEARS[0]}+{TEMPORAL_TRAIN_YEARS[1]}, test {TEMPORAL_TEST_YEAR}"
 REDUCED_EXPERIMENT = f"Reduced ({REDUCED_FEATURE_COUNT} predictors)"
 ACCURACY_EXPERIMENT = "Accuracy-tuned (unweighted)"
+EXTENDED_EXPERIMENT = f"Extended (+{len(EXTENDED_FEATURES)} predictors)"
 
 # Hypothesis 1: test accuracy each model is expected to reach with the ten predictors
 HYPOTHESIS_1_TARGETS = {
@@ -80,9 +87,9 @@ SCORING = "f1_macro"
 # Preprocessing: fit on training folds only because it lives inside each model's Pipeline
 def build_preprocessor(features=FEATURES):
     return ColumnTransformer([
-        ("num", StandardScaler(), [f for f in NUMERIC_FEATURES if f in features]),
+        ("num", StandardScaler(), [f for f in NUMERIC_FEATURES + EXTENDED_NUMERIC_FEATURES if f in features]),
         ("cat", OneHotEncoder(handle_unknown="ignore", sparse_output=False),
-         [f for f in CATEGORICAL_FEATURES if f in features]),
+         [f for f in CATEGORICAL_FEATURES + EXTENDED_CATEGORICAL_FEATURES if f in features]),
         ("dis", "passthrough", [f for f in DISABILITY_FEATURES if f in features]),
     ])
 
@@ -375,6 +382,16 @@ def main():
     r_results, r_best = test_models(r_models, r_x_test, r_y_test)
     summary.append(summarize(REDUCED_EXPERIMENT, r_results, r_best))
     tables.append(results_table(r_results, REDUCED_EXPERIMENT))
+
+    # Step 6b: extended model, the ten predictors plus five household/geography predictors
+    # (same seed and stratified split as the random experiment, so both are tested on the same people)
+    print(f"\n===== Experiment: extended model, ten predictors + {EXTENDED_FEATURES} =====")
+    e_models, _, e_x_test, _, e_y_test = train_models(df, features=FEATURES + EXTENDED_FEATURES)
+    e_results, e_best = test_models(e_models, e_x_test, e_y_test)
+    summary.append(summarize(EXTENDED_EXPERIMENT, e_results, e_best))
+    tables.append(results_table(e_results, EXTENDED_EXPERIMENT))
+    print(f"\nHypothesis 1, {EXTENDED_EXPERIMENT}:")
+    print(hypothesis_1_check(e_results).to_string(index=False))
 
     summary = pd.DataFrame(summary)
     print("\n===== Summary: best model per experiment =====")

@@ -22,8 +22,8 @@ CONFUSION_CHART = "confusion_chart"
 BASELINE_PREFIX = "Baseline"
 METRICS = ["Accuracy", "Macro F1", "ROC AUC"]
 
-# colorblind-safe categorical order (validated for up to four series); one color per experiment
-EXPERIMENT_COLORS = ["#2a78d6", "#eb6834", "#1baf7a", "#eda100"]
+# categorical order, one color per experiment (first four colorblind-safe; fifth is a distinct purple)
+EXPERIMENT_COLORS = ["#2a78d6", "#eb6834", "#1baf7a", "#eda100", "#8b5cc4"]
 BASELINE_COLOR = "#b4b2a9"
 SURFACE = "#ffffff"
 TEXT_PRIMARY = "#0b0b0b"
@@ -160,8 +160,8 @@ def plot_confusion(df, path):
 
     fig.suptitle("Predicted vs actual digital exclusion, best model (macro F1) per experiment",
                  fontsize=13, color=TEXT_PRIMARY)
-    fig.tight_layout()
-    fig.savefig(path, dpi=200, facecolor=SURFACE)
+    fig.tight_layout(rect=(0, 0, 1, 1 - 0.35 / fig.get_figheight()))  # keep room for the suptitle
+    fig.savefig(path, dpi=200, facecolor=SURFACE, bbox_inches="tight", pad_inches=0.2)
     plt.close(fig)
 
 

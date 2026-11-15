@@ -62,6 +62,14 @@ class TestPlotResults(unittest.TestCase):
             paths = plot_results.main()
         self.assertTrue(all(os.path.exists(p) for p in paths.values()))
 
+    def test_works_with_five_experiments(self):
+        experiments = ("Random split", "Accuracy-tuned (unweighted)", "Train 2019+2021, test 2023",
+                       "Reduced (4 predictors)", "Extended (+5 predictors)")
+        make_results(experiments=experiments).to_csv(plot_results.RESULTS_FILE, index=False)
+        with mock.patch("builtins.print"):
+            paths = plot_results.main()
+        self.assertTrue(all(os.path.exists(p) for p in paths.values()))
+
     def test_missing_results_file_returns_none(self):
         with mock.patch("builtins.print") as mock_print:
             self.assertIsNone(plot_results.main())

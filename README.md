@@ -37,7 +37,7 @@ python -m unittest test_dataPrep -v   # runs the unit tests
 ## Running main.py
 Requires `matplotlib` for the charts (`pip install matplotlib`).
 ```
-python main.py                        # predicts digital exclusion: random split, 2019+2021 -> 2023 check, feature importance, reduced model
+python main.py                        # predicts digital exclusion: random split, 2019+2021 -> 2023 check, feature importance, reduced model, extended model
 python -m unittest test_main -v       # runs the unit tests
 ```
 `main.py` writes `results/model_performance.csv` (accuracy, macro F1, ROC AUC and predicted-vs-actual

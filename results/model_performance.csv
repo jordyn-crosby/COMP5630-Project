@@ -19,3 +19,8 @@ Reduced (4 predictors),Decision Tree,5629,0.674,0.675,0.563,0.68,0.616,0.667,0.7
 Reduced (4 predictors),Random Forest,5629,0.68,0.681,0.568,0.689,0.623,0.672,0.738,2335,1131,673,1490
 Reduced (4 predictors),XGBoost,5629,0.683,0.683,0.573,0.682,0.623,0.675,0.74,2368,1098,688,1475
 Reduced (4 predictors),Baseline (always connected),5629,0.616,0.5,0.0,0.0,0.0,0.381,0.5,3466,0,2163,0
+Extended (+5 predictors),Logistic Regression,5629,0.679,0.678,0.569,0.673,0.617,0.67,0.742,2364,1102,707,1456
+Extended (+5 predictors),Decision Tree,5629,0.664,0.667,0.551,0.679,0.608,0.657,0.72,2268,1198,694,1469
+Extended (+5 predictors),Random Forest,5629,0.688,0.688,0.579,0.687,0.628,0.68,0.747,2384,1082,676,1487
+Extended (+5 predictors),XGBoost,5629,0.683,0.685,0.573,0.693,0.627,0.676,0.747,2348,1118,665,1498
+Extended (+5 predictors),Baseline (always connected),5629,0.616,0.5,0.0,0.0,0.0,0.381,0.5,3466,0,2163,0

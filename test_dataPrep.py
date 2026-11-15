@@ -235,6 +235,12 @@ class TestFeatureSelection(TempDirTestCase):
              "HETENURE", "GESTFIPS", "PEMLR", "DISTYPE", "DIG_EXCLUDED"} | INDICATOR_COLUMNS,
         )
 
+    def test_keeps_extended_predictor_columns(self):
+        extended = {"HRNUMHOU": 2, "PRNMCHLD": 0, "GTMETSTA": 1, "PEAFEVER": 2, "PRCITSHP": 1}
+        result = dataPrep.feature_selection(pd.DataFrame([make_row(**extended)]))
+        for col, value in extended.items():
+            self.assertEqual(result[col].tolist(), [value])
+
     def test_keeps_year_and_target_but_drops_internet_columns(self):
         df = pd.DataFrame([make_row(HRYEAR4=2023, PEINHOME=1, HEINHOME=1, PEDESKTP=1)])
         result = dataPrep.feature_selection(df)
