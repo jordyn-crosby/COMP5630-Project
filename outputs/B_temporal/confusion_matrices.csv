@@ -1,0 +1,21 @@
+Model,true,predicted,count
+Dummy (majority),user,user,4238
+Dummy (majority),user,excluded,0
+Dummy (majority),excluded,user,2030
+Dummy (majority),excluded,excluded,0
+Logistic Regression,user,user,2908
+Logistic Regression,user,excluded,1330
+Logistic Regression,excluded,user,709
+Logistic Regression,excluded,excluded,1321
+Decision Tree,user,user,2828
+Decision Tree,user,excluded,1410
+Decision Tree,excluded,user,722
+Decision Tree,excluded,excluded,1308
+Random Forest,user,user,2892
+Random Forest,user,excluded,1346
+Random Forest,excluded,user,686
+Random Forest,excluded,excluded,1344
+XGBoost,user,user,2875
+XGBoost,user,excluded,1363
+XGBoost,excluded,user,677
+XGBoost,excluded,excluded,1353
