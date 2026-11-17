@@ -21,6 +21,7 @@
 #
 # Run:  python main.py                 (both experiments; runs dataPrep first if data/predictor_data.csv is missing)
 #       python main.py --experiment A  (pooled only)   python main.py --experiment B  (temporal only)
+#       python main.py --experiment D  (sensitivity: A's split with five extra household/geography predictors)
 #       python main.py --cv 3 --quick  (smaller grids, for a smoke test)
 
 import argparse
@@ -68,11 +69,21 @@ BINARY_FEATURES = list(dataPrep.DISABILITY_INDICATORS)
 
 FEATURES = NUMERIC_FEATURES + CATEGORICAL_FEATURES + BINARY_FEATURES
 
+# extended sensitivity run D: the fifteen inputs plus five household / geography predictors
+EXTENDED_NUMERIC_FEATURES = ["HRNUMHOU", "PRNMCHLD"]                   # household size, own children under 18
+EXTENDED_CATEGORICAL_FEATURES = ["GTMETSTA", "PEAFEVER", "PRCITSHP"]  # metro status, veteran status, citizenship
+EXTENDED_FEATURES = FEATURES + EXTENDED_NUMERIC_FEATURES + EXTENDED_CATEGORICAL_FEATURES
+
+ALL_NUMERIC_FEATURES = NUMERIC_FEATURES + EXTENDED_NUMERIC_FEATURES
+ALL_CATEGORICAL_FEATURES = CATEGORICAL_FEATURES + EXTENDED_CATEGORICAL_FEATURES
+
 # conceptual group of every raw column (used to aggregate importances back to the ten groups)
 FEATURE_GROUPS = {
     "PRTAGE": "Age", "PESEX": "Sex", "PTDTRACE": "Race", "PEEDUCA": "Education", "HEFAMINC": "Family income",
     "HETENURE": "Housing tenure", "PEMARITL": "Marital status", "PEMLR": "Employment status", "GESTFIPS": "State",
     **{col: "Disability type" for col in BINARY_FEATURES},
+    "HRNUMHOU": "Household size", "PRNMCHLD": "Children under 18", "GTMETSTA": "Metropolitan status",
+    "PEAFEVER": "Veteran status", "PRCITSHP": "Citizenship",
 }
 
 # H3 reduced set, prespecified in the proposal: education, household income, age, disability type
@@ -101,8 +112,8 @@ MODEL_ORDER = ["Dummy (majority)", "Logistic Regression", "Decision Tree", "Rand
 def build_preprocessor(features=None):
     """Fit on training folds only because it lives inside each model's Pipeline."""
     features = FEATURES if features is None else features
-    numeric = [f for f in NUMERIC_FEATURES if f in features]
-    categorical = [f for f in CATEGORICAL_FEATURES if f in features]
+    numeric = [f for f in ALL_NUMERIC_FEATURES if f in features]
+    categorical = [f for f in ALL_CATEGORICAL_FEATURES if f in features]
     binary = [f for f in BINARY_FEATURES if f in features]
     transformers = []
     if numeric:
@@ -305,7 +316,7 @@ def logistic_coefficients(search, train_df, features=None):
     names = prep.get_feature_names_out()
     coefs = model.coef_.ravel()
     rows = []
-    numeric = [f for f in NUMERIC_FEATURES if f in features]
+    numeric = [f for f in ALL_NUMERIC_FEATURES if f in features]
     scaler = prep.named_transformers_["num"] if numeric else None
     for n, c in zip(names, coefs):
         kind, raw = n.split("__", 1)
@@ -323,7 +334,7 @@ def logistic_coefficients(search, train_df, features=None):
                          "coef_per_unit": c, "coef_vs_reference": np.nan, "unit": "0/1 flag"})
     table = pd.DataFrame(rows)
     # contrast each category against the most frequent training category of the same variable
-    for var in [f for f in CATEGORICAL_FEATURES if f in features]:
+    for var in [f for f in ALL_CATEGORICAL_FEATURES if f in features]:
         ref = str(train_df[var].mode().iloc[0])
         mask = table["input"] == var
         ref_row = table[mask & (table["category"] == ref)]
@@ -440,7 +451,7 @@ def save_results(outdir, results, predictions, cv_summary, cv_fold_table, search
 def base_manifest(name, description, features, cv, quick, scoring=SCORING, class_weighting=True):
     return {
         "experiment": name, "description": description,
-        "protocol_experiment": bool(scoring == SCORING and class_weighting),
+        "protocol_experiment": bool(scoring == SCORING and class_weighting and set(features) <= set(FEATURES)),
         "timestamp_utc": datetime.now(timezone.utc).isoformat(),
         "python": sys.version.split()[0], "platform": platform.platform(),
         "pandas": pd.__version__, "numpy": np.__version__, "scikit-learn": sklearn.__version__,
@@ -495,12 +506,13 @@ def run_experiment(name, train_df, test_df, outdir, description, features=None, 
     return results, searches
 
 
-def load_predictor_table():
+def load_predictor_table(features=None):
+    features = FEATURES if features is None else features
     if not os.path.exists(PREDICTOR_FILE):
         if dataPrep.main() is None:
             return None
     df = pd.read_csv(PREDICTOR_FILE)
-    missing = [c for c in FEATURES + [TARGET] + ID_COLUMNS if c not in df.columns]
+    missing = [c for c in features + [TARGET] + ID_COLUMNS if c not in df.columns]
     if missing:
         raise ValueError(f"{PREDICTOR_FILE} is missing {missing}; delete it and rerun dataPrep.py to rebuild")
     leaked = sorted(set(df.columns) & INTERNET_COLUMNS)
@@ -510,7 +522,7 @@ def load_predictor_table():
 
 
 def main(experiment="both", cv=5, quick=False, outdir=OUTPUT_DIR, verbose=True):
-    df = load_predictor_table()
+    df = load_predictor_table(EXTENDED_FEATURES if experiment == "D" else FEATURES)
     if df is None:
         return None
     summary = {}
@@ -544,6 +556,18 @@ def main(experiment="both", cv=5, quick=False, outdir=OUTPUT_DIR, verbose=True):
             cv=cv, quick=quick, verbose=verbose, interpret=False, scoring="accuracy", class_weighting=False)
         summary["C_accuracy_tuned"] = results
 
+    # Sensitivity experiment D (not part of the protocol, never a headline): the pooled split and protocol
+    # settings of A, with five extra household / geography predictors. Same test records as A, so the
+    # difference from A shows what those predictors add.
+    if experiment == "D":
+        train, test = pooled_split(df)
+        results, _ = run_experiment(
+            "D_extended", train, test, os.path.join(outdir, "D_extended"),
+            "sensitivity: same pooled household-grouped split as A, fifteen inputs plus household size, children "
+            "under 18, metropolitan status, veteran status and citizenship",
+            features=EXTENDED_FEATURES, cv=cv, quick=quick, verbose=verbose)
+        summary["D_extended"] = results
+
     if verbose:
         print("\n===== Summary: held-out accuracy / macro F1 / ROC AUC =====")
         for exp, results in summary.items():
@@ -554,8 +578,9 @@ def main(experiment="both", cv=5, quick=False, outdir=OUTPUT_DIR, verbose=True):
 
 if __name__ == "__main__":
     parser = argparse.ArgumentParser(description="Run the digital exclusion experiments.")
-    parser.add_argument("--experiment", choices=["both", "A", "B", "C"], default="both",
-                        help="both = protocol experiments B then A; C = accuracy-tuned sensitivity run")
+    parser.add_argument("--experiment", choices=["both", "A", "B", "C", "D"], default="both",
+                        help="both = protocol experiments B then A; C = accuracy-tuned sensitivity run; "
+                             "D = extended-predictor sensitivity run")
     parser.add_argument("--cv", type=int, default=5, help="k for the training-only cross-validation")
     parser.add_argument("--quick", action="store_true", help="tiny grids for a smoke test")
     parser.add_argument("--outdir", default=OUTPUT_DIR)

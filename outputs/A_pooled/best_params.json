@@ -7,8 +7,8 @@
     "model__min_samples_leaf": 1
   },
   "Random Forest": {
-    "model__max_depth": null,
-    "model__min_samples_leaf": 5
+    "model__max_depth": 10,
+    "model__min_samples_leaf": 1
   },
   "XGBoost": {
     "model__learning_rate": 0.1,

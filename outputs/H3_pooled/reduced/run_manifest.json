@@ -1,15 +1,17 @@
 {
   "experiment": "H3_pooled_reduced",
   "description": "pooled protocol, reduced set: age, income, education, disability type",
-  "timestamp_utc": "2026-11-04T12:17:53.045676+00:00",
-  "python": "3.13.18",
-  "platform": "Linux-6.18.44-fc-v233-x86_64-with-glibc2.39",
-  "pandas": "3.0.5",
-  "numpy": "2.5.3",
-  "scikit-learn": "1.9.1",
-  "xgboost": "3.4.1",
+  "protocol_experiment": true,
+  "timestamp_utc": "2026-11-17T22:00:47.665554+00:00",
+  "python": "3.9.6",
+  "platform": "macOS-27.0.1-arm64-arm-64bit",
+  "pandas": "2.3.3",
+  "numpy": "2.0.2",
+  "scikit-learn": "1.6.1",
+  "xgboost": "2.1.4",
   "seed": 42,
   "scoring": "f1_macro",
+  "class_weighting": true,
   "cv_folds": 5,
   "quick_grids": false,
   "target": "DIGITAL_EXCLUSION",
@@ -40,28 +42,28 @@
     "split procedure"
   ],
   "train": {
-    "n": 13133,
-    "excluded": 5045,
-    "exclusion_rate": 0.3841,
+    "n": 13149,
+    "excluded": 5031,
+    "exclusion_rate": 0.3826,
     "households": 11815,
     "years": {
-      "2019": 4664,
-      "2021": 4095,
-      "2023": 4374
+      "2019": 4636,
+      "2021": 4121,
+      "2023": 4392
     }
   },
   "test": {
-    "n": 5629,
-    "excluded": 2163,
-    "exclusion_rate": 0.3843,
+    "n": 5613,
+    "excluded": 2177,
+    "exclusion_rate": 0.3878,
     "households": 5060,
     "years": {
-      "2019": 1946,
-      "2021": 1789,
-      "2023": 1894
+      "2019": 1974,
+      "2021": 1763,
+      "2023": 1876
     }
   },
-  "realized_test_fraction": 0.3,
+  "realized_test_fraction": 0.2992,
   "grids": {
     "Logistic Regression": {
       "model__C": [
@@ -113,18 +115,18 @@
   },
   "best_params": {
     "Logistic Regression": {
-      "model__C": 0.1
+      "model__C": 10
     },
     "Decision Tree": {
       "model__max_depth": 3,
       "model__min_samples_leaf": 1
     },
     "Random Forest": {
-      "model__max_depth": 5,
+      "model__max_depth": null,
       "model__min_samples_leaf": 20
     },
     "XGBoost": {
-      "model__learning_rate": 0.05,
+      "model__learning_rate": 0.1,
       "model__max_depth": 3,
       "model__n_estimators": 100
     }

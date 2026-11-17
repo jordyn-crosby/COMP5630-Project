@@ -1,5 +1,5 @@
 Model,Best Params,CV f1_macro mean,CV f1_macro std,CV train f1_macro mean,Candidates,Fit seconds
-Logistic Regression,"{""model__C"": 0.01}",0.6687,0.0056,0.6719,4,3.5
-Decision Tree,"{""model__max_depth"": 3, ""model__min_samples_leaf"": 1}",0.6616,0.0072,0.6637,12,3.9
-Random Forest,"{""model__max_depth"": null, ""model__min_samples_leaf"": 5}",0.6699,0.0039,0.7382,9,85.6
-XGBoost,"{""model__learning_rate"": 0.1, ""model__max_depth"": 3, ""model__n_estimators"": 100}",0.671,0.0048,0.6896,8,13.0
+Logistic Regression,"{""model__C"": 0.01}",0.6731,0.0063,0.6754,4,1.4
+Decision Tree,"{""model__max_depth"": 3, ""model__min_samples_leaf"": 1}",0.6617,0.0094,0.6643,12,0.7
+Random Forest,"{""model__max_depth"": 10, ""model__min_samples_leaf"": 1}",0.6725,0.0039,0.7359,9,11.6
+XGBoost,"{""model__learning_rate"": 0.1, ""model__max_depth"": 3, ""model__n_estimators"": 100}",0.6748,0.0031,0.6927,8,1.8

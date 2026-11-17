@@ -15,8 +15,8 @@ python src/run_all.py
 ```
 
 `run_all.py` extracts the raw files from `data/data.zip` if they are not already in `data/`, builds the modeling
-table, runs the 55 unit tests, runs Experiment B (temporal) then Experiment A (pooled), the H3 feature-reduction
-check and the sensitivity run C, and draws the figures. About 15 minutes on a laptop. Add `--raw-dir /folder`
+table, runs the 58 unit tests, runs Experiment B (temporal) then Experiment A (pooled), the H3 feature-reduction
+check and the sensitivity runs C and D, and draws the figures. About 15 minutes on a laptop. Add `--raw-dir /folder`
 if the CPS files live elsewhere, `--skip-tests` or `--skip-sensitivity` to shorten it, `--quick` for a smoke test.
 
 The committed `data/predictor_data.csv` (18,762 rows) lets `python src/main.py` run immediately without the
@@ -27,7 +27,7 @@ raw files; `src/dataPrep.py` rebuilds it from the raw files in about 5 seconds.
 | Path | Contents |
 |---|---|
 | `src/dataPrep.py` | reads only the ~45 needed columns from each raw file, harmonizes GCFIP/GESTFIPS, applies the cohort rule (age 65+ and any of the six CPS disability categories), builds the outcome before dropping any source field, writes `data/filtered_data.csv` (audit), `data/predictor_data.csv` (modeling), `data/cohort_summary.csv` |
-| `src/main.py` | Experiment B (tune on 2019+2021 with household-grouped stratified CV, evaluate once on 2023), Experiment A (pooled, outcome-stratified 70/30 split keeping households together), optional sensitivity run C (`--experiment C`: unweighted classes, tuned on accuracy) |
+| `src/main.py` | Experiment B (tune on 2019+2021 with household-grouped stratified CV, evaluate once on 2023), Experiment A (pooled, outcome-stratified 70/30 split keeping households together), optional sensitivity runs C (`--experiment C`: unweighted classes, tuned on accuracy) and D (`--experiment D`: A's split with five extra predictors: household size, children under 18, metropolitan status, veteran status, citizenship) |
 | `src/h3_feature_reduction.py` | full ten-group model vs the prespecified reduced set (age, income, education, disability type) with tolerances fixed before results are seen |
 | `src/plot_results.py` | `results/model_performance.csv` and the two figures, drawn from the saved outputs |
 | `src/run_all.py` | the one-command pipeline above |
@@ -64,7 +64,8 @@ raw files; `src/dataPrep.py` rebuilds it from the raw files in about 5 seconds.
   outcome-stratified folds, scored on macro F1, with class weighting. A majority-class dummy fitted on training
   labels is the baseline.
 * Experiment B runs before A with everything frozen; nothing from 2023 or from the pooled run feeds back into
-  tuning. Run C is a labeled sensitivity analysis (`protocol_experiment: false` in its manifest), never a headline.
+  tuning. Runs C and D are labeled sensitivity analyses (`protocol_experiment: false` in their manifests), never
+  headlines.
 * Headline results (held-out): pooled accuracy 67.1 to 68.4% and ROC AUC 0.69 to 0.74 against 61.6% / 0.50 for
   the baseline; 2023 accuracy 66.0 to 67.6%, ROC AUC 0.70 to 0.73. H1 (literature accuracy targets) not met;
   H2 (ensembles above single models) holds against the tree but not against logistic regression; H3 (reduced

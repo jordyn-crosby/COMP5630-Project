@@ -7,7 +7,8 @@
 #   results/confusion_matrix.png    predicted vs actual for the best model (macro F1) in each experiment
 #
 # Experiments drawn, in order: A_pooled (protocol), B_temporal (protocol), H3_pooled/reduced (prespecified
-# parsimony check), C_accuracy_tuned (sensitivity: unweighted classes, tuned on accuracy; not a headline).
+# parsimony check), C_accuracy_tuned (sensitivity: unweighted classes, tuned on accuracy; not a headline),
+# D_extended (sensitivity: A's split with five extra household/geography predictors; not a headline).
 # Experiments whose folder is missing are skipped.
 #
 # Run:  python plot_results.py                (reads outputs/, writes results/)
@@ -31,13 +32,14 @@ EXPERIMENTS = [
     ("B_temporal", "Train 2019+2021, test 2023"),
     (os.path.join("H3_pooled", "reduced"), "Reduced (age, income, education, disability)"),
     ("C_accuracy_tuned", "Accuracy-tuned, unweighted (sensitivity)"),
+    ("D_extended", "Extended, +5 predictors (sensitivity)"),
 ]
 MODELS = ["Logistic Regression", "Decision Tree", "Random Forest", "XGBoost"]
 BASELINE_IN = "Dummy (majority)"
 BASELINE_OUT = "Baseline (always connected)"
 
-# validated categorical palette (slots 1-4, light surface) + neutral for the baseline
-SERIES = ["#2a78d6", "#eb6834", "#1baf7a", "#eda100"]
+# validated categorical palette (slots 1-4, light surface; slot 5 a distinct purple) + neutral for the baseline
+SERIES = ["#2a78d6", "#eb6834", "#1baf7a", "#eda100", "#8b5cc4"]
 NEUTRAL = "#9a9994"
 TEXT = "#0b0b0b"
 TEXT_2 = "#52514e"
@@ -130,7 +132,8 @@ def plot_performance(table, path):
 
     handles = [Patch(facecolor=SERIES[i], label=exp) for i, exp in enumerate(experiments)]
     handles.append(Patch(facecolor=NEUTRAL, label="Baseline (same experiments, in order)"))
-    fig.legend(handles=handles, loc="upper left", bbox_to_anchor=(0.045, 0.955), ncol=len(handles),
+    # wrap onto a second row once the experiments no longer fit across the figure
+    fig.legend(handles=handles, loc="upper left", bbox_to_anchor=(0.045, 0.955), ncol=min(len(handles), 4),
                frameon=False, fontsize=8, handlelength=1.2, columnspacing=1.4)
     fig.suptitle("How well each model predicts digital exclusion", x=0.045, y=0.995, ha="left",
                  fontsize=12, fontweight="bold")
@@ -139,7 +142,7 @@ def plot_performance(table, path):
                            "Best bar among the protocol experiments labeled; the sensitivity run trades excluded-class "
                            "recall for accuracy (see confusion matrices).",
              fontsize=7.5, color=TEXT_2, va="bottom", linespacing=1.5)
-    fig.tight_layout(rect=(0, 0.06, 1, 0.9))
+    fig.tight_layout(rect=(0, 0.06, 1, 0.9 if len(handles) <= 4 else 0.86))
     fig.savefig(path, dpi=300)
     plt.close(fig)
 

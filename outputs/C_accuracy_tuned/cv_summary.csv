@@ -1,5 +1,5 @@
 Model,Best Params,CV accuracy mean,CV accuracy std,CV train accuracy mean,Candidates,Fit seconds
-Logistic Regression,"{""model__C"": 0.01}",0.6947,0.0059,0.6966,4,1.8
-Decision Tree,"{""model__max_depth"": 5, ""model__min_samples_leaf"": 50}",0.6836,0.0038,0.6952,12,1.6
-Random Forest,"{""model__max_depth"": null, ""model__min_samples_leaf"": 5}",0.6958,0.0023,0.7586,9,38.0
-XGBoost,"{""model__learning_rate"": 0.1, ""model__max_depth"": 3, ""model__n_estimators"": 100}",0.6955,0.0039,0.7161,8,6.8
+Logistic Regression,"{""model__C"": 0.1}",0.6944,0.0054,0.6968,4,1.5
+Decision Tree,"{""model__max_depth"": 5, ""model__min_samples_leaf"": 1}",0.6835,0.0071,0.6997,12,0.7
+Random Forest,"{""model__max_depth"": null, ""model__min_samples_leaf"": 5}",0.6991,0.0043,0.757,9,10.9
+XGBoost,"{""model__learning_rate"": 0.05, ""model__max_depth"": 3, ""model__n_estimators"": 300}",0.701,0.0087,0.721,8,2.0

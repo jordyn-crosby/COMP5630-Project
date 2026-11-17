@@ -1,0 +1,18 @@
+{
+  "Logistic Regression": {
+    "model__C": 0.01
+  },
+  "Decision Tree": {
+    "model__max_depth": 3,
+    "model__min_samples_leaf": 1
+  },
+  "Random Forest": {
+    "model__max_depth": null,
+    "model__min_samples_leaf": 5
+  },
+  "XGBoost": {
+    "model__learning_rate": 0.05,
+    "model__max_depth": 3,
+    "model__n_estimators": 300
+  }
+}

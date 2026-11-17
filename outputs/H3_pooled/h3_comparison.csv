@@ -1,5 +1,5 @@
 Model,Full accuracy (%),Reduced accuracy (%),Accuracy drop (points),Full recall excluded (%),Reduced recall excluded (%),Recall drop (points),F1 excluded drop (points),ROC AUC drop (points),Within accuracy tolerance,Within recall tolerance,H3 holds for this model
-Logistic Regression,68.38,67.72,0.66,67.31,65.33,1.99,1.2,0.72,True,True,True
-Decision Tree,67.1,67.1,0.0,60.19,60.19,0.0,0.0,0.0,True,True,True
-Random Forest,68.43,66.81,1.62,68.61,67.22,1.39,1.66,1.12,True,True,True
-XGBoost,68.18,67.45,0.73,68.01,67.55,0.46,0.7,0.67,True,True,True
+Logistic Regression,67.68,67.43,0.25,67.94,66.51,1.42,0.68,0.51,True,True,True
+Decision Tree,66.15,66.15,0.0,64.26,64.26,0.0,0.0,0.0,True,True,True
+Random Forest,67.7,67.65,0.05,67.48,67.89,-0.41,-0.11,0.14,True,True,True
+XGBoost,67.38,67.36,0.02,68.95,69.22,-0.28,-0.08,0.28,True,True,True

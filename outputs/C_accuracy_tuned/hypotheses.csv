@@ -1,9 +1,9 @@
 Hypothesis,Model,Metric,Value,Target,Met
-H1,Logistic Regression,Accuracy (%),69.8,78.3,False
-H1,Decision Tree,Accuracy (%),68.73,80.7,False
-H1,Random Forest,Accuracy (%),70.33,80.0,False
-H1,XGBoost,Accuracy (%),69.87,79.0,False
+H1,Logistic Regression,Accuracy (%),69.55,78.3,False
+H1,Decision Tree,Accuracy (%),68.22,80.7,False
+H1,Random Forest,Accuracy (%),69.41,80.0,False
+H1,XGBoost,Accuracy (%),69.78,79.0,False
 H1,any model,at least one target met,False,True,False
-H2,RF & XGB vs LR & DT,Accuracy,ensembles 0.6987-0.7033 vs singles 0.6873-0.6980,both ensembles above both single models,True
-H2,RF & XGB vs LR & DT,Macro F1,ensembles 0.6638-0.6672 vs singles 0.6519-0.6570,both ensembles above both single models,True
-H2,RF & XGB vs LR & DT,ROC AUC,ensembles 0.7386-0.7391 vs singles 0.7156-0.7372,both ensembles above both single models,True
+H2,RF & XGB vs LR & DT,Accuracy,ensembles 0.6941-0.6978 vs singles 0.6822-0.6955,both ensembles above both single models,False
+H2,RF & XGB vs LR & DT,Macro F1,ensembles 0.6562-0.6682 vs singles 0.6525-0.6582,both ensembles above both single models,False
+H2,RF & XGB vs LR & DT,ROC AUC,ensembles 0.7358-0.7375 vs singles 0.7163-0.7381,both ensembles above both single models,False

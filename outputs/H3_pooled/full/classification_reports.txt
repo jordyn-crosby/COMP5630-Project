@@ -1,70 +1,70 @@
 ===== Dummy (majority) =====
               precision    recall  f1-score   support
 
-        user       0.62      1.00      0.76      3466
-    excluded       0.00      0.00      0.00      2163
+        user       0.61      1.00      0.76      3436
+    excluded       0.00      0.00      0.00      2177
 
-    accuracy                           0.62      5629
-   macro avg       0.31      0.50      0.38      5629
-weighted avg       0.38      0.62      0.47      5629
+    accuracy                           0.61      5613
+   macro avg       0.31      0.50      0.38      5613
+weighted avg       0.37      0.61      0.46      5613
 
 Confusion matrix [[TN FP] [FN TP]]:
-[[3466    0]
- [2163    0]]
+[[3436    0]
+ [2177    0]]
 
 ===== Logistic Regression =====
               precision    recall  f1-score   support
 
-        user       0.77      0.69      0.73      3466
-    excluded       0.58      0.67      0.62      2163
+        user       0.77      0.68      0.72      3436
+    excluded       0.57      0.68      0.62      2177
 
-    accuracy                           0.68      5629
-   macro avg       0.67      0.68      0.67      5629
-weighted avg       0.70      0.68      0.69      5629
+    accuracy                           0.68      5613
+   macro avg       0.67      0.68      0.67      5613
+weighted avg       0.69      0.68      0.68      5613
 
 Confusion matrix [[TN FP] [FN TP]]:
-[[2393 1073]
- [ 707 1456]]
+[[2320 1116]
+ [ 698 1479]]
 
 ===== Decision Tree =====
               precision    recall  f1-score   support
 
-        user       0.74      0.71      0.73      3466
-    excluded       0.57      0.60      0.58      2163
+        user       0.75      0.67      0.71      3436
+    excluded       0.55      0.64      0.60      2177
 
-    accuracy                           0.67      5629
-   macro avg       0.65      0.66      0.66      5629
-weighted avg       0.68      0.67      0.67      5629
+    accuracy                           0.66      5613
+   macro avg       0.65      0.66      0.65      5613
+weighted avg       0.67      0.66      0.66      5613
 
 Confusion matrix [[TN FP] [FN TP]]:
-[[2475  991]
- [ 861 1302]]
+[[2314 1122]
+ [ 778 1399]]
 
 ===== Random Forest =====
               precision    recall  f1-score   support
 
-        user       0.78      0.68      0.73      3466
-    excluded       0.57      0.69      0.63      2163
+        user       0.77      0.68      0.72      3436
+    excluded       0.57      0.67      0.62      2177
 
-    accuracy                           0.68      5629
-   macro avg       0.68      0.68      0.68      5629
-weighted avg       0.70      0.68      0.69      5629
+    accuracy                           0.68      5613
+   macro avg       0.67      0.68      0.67      5613
+weighted avg       0.69      0.68      0.68      5613
 
 Confusion matrix [[TN FP] [FN TP]]:
-[[2368 1098]
- [ 679 1484]]
+[[2331 1105]
+ [ 708 1469]]
 
 ===== XGBoost =====
               precision    recall  f1-score   support
 
-        user       0.77      0.68      0.73      3466
-    excluded       0.57      0.68      0.62      2163
+        user       0.77      0.66      0.71      3436
+    excluded       0.57      0.69      0.62      2177
 
-    accuracy                           0.68      5629
-   macro avg       0.67      0.68      0.67      5629
-weighted avg       0.70      0.68      0.69      5629
+    accuracy                           0.67      5613
+   macro avg       0.67      0.68      0.67      5613
+weighted avg       0.69      0.67      0.68      5613
 
 Confusion matrix [[TN FP] [FN TP]]:
-[[2367 1099]
- [ 692 1471]]
+[[2281 1155]
+ [ 676 1501]]
 

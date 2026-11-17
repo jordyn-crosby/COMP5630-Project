@@ -19,7 +19,8 @@
 #
 # Outputs (all written to data/):
 #   filtered_data.csv   cohort rows with predictors, outcome, outcome source fields and metadata (audit table)
-#   predictor_data.csv  modeling table: metadata + 15 inputs + DIGITAL_EXCLUSION (no internet fields)
+#   predictor_data.csv  modeling table: metadata + 15 inputs + 4 extended-run inputs + DIGITAL_EXCLUSION
+#                       (no internet fields)
 #   cohort_summary.csv  per-year and total counts at every cohort step
 #
 # Run:  python dataPrep.py            (expects data/CPS2019.csv, data/CPS2021.csv, data/CPS2023.csv,
@@ -74,6 +75,15 @@ PREDICTOR_COLUMNS = [
     "GESTFIPS",  # state FIPS code
 ]
 
+# extra household / geography predictors, used only in the extended sensitivity run (main.py --experiment D);
+# household size (HRNUMHOU) is the fifth extended input and is already kept as metadata above
+EXTENDED_PREDICTOR_COLUMNS = [
+    "PRNMCHLD",  # number of own children under 18
+    "GTMETSTA",  # metropolitan status
+    "PEAFEVER",  # ever served on active duty (veteran status)
+    "PRCITSHP",  # citizenship status
+]
+
 # tenth predictor group: disability type. Census flag -> (readable name, 0/1 indicator column)
 # All six CPS disability categories (team decision, November 4, 2026). The cohort rule is an OR across
 # these flags, which is the same population as PRDISFLG = 1; the flags also enter the model as inputs.
@@ -116,7 +126,7 @@ UNRESOLVED_CODES = (-2, -3, -9)
 OUTCOME = "DIGITAL_EXCLUSION"
 
 # every column read from the raw files (the raw files have 500+ columns; reading only these keeps memory low)
-RAW_COLUMNS = (METADATA_COLUMNS + PREDICTOR_COLUMNS + DISABILITY_FLAGS + EXTRA_DISABILITY_AUDIT
+RAW_COLUMNS = (METADATA_COLUMNS + PREDICTOR_COLUMNS + EXTENDED_PREDICTOR_COLUMNS + DISABILITY_FLAGS + EXTRA_DISABILITY_AUDIT
                + OUTCOME_SOURCE_COLUMNS + ["HXFAMINC"])
 
 
@@ -268,12 +278,13 @@ def feature_selection(df, write=True):
     """
     df = add_disability_indicators(df)
 
-    audit_columns = [c for c in METADATA_COLUMNS + PREDICTOR_COLUMNS + DISABILITY_FLAGS + EXTRA_DISABILITY_AUDIT
+    audit_columns = [c for c in METADATA_COLUMNS + PREDICTOR_COLUMNS + EXTENDED_PREDICTOR_COLUMNS
+                     + DISABILITY_FLAGS + EXTRA_DISABILITY_AUDIT
                      + DISABILITY_INDICATORS + ["DISTYPE", "HXFAMINC"] + OUTCOME_SOURCE_COLUMNS
                      + ["INTERNET_USER", "OUTCOME_STATUS", OUTCOME] if c in df.columns]
     filtered = df[audit_columns]
 
-    model_columns = [c for c in METADATA_COLUMNS + PREDICTOR_COLUMNS + DISABILITY_INDICATORS
+    model_columns = [c for c in METADATA_COLUMNS + PREDICTOR_COLUMNS + EXTENDED_PREDICTOR_COLUMNS + DISABILITY_INDICATORS
                      + ["DISTYPE", OUTCOME] if c in df.columns]
     predictor = df.loc[df["OUTCOME_STATUS"] == "resolved", model_columns].copy()
     predictor[OUTCOME] = predictor[OUTCOME].astype(int)

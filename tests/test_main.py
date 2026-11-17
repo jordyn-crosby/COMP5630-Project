@@ -34,6 +34,10 @@ def make_df(n=400, seed=0):
         "HETENURE": rng.integers(1, 4, n),
         "GESTFIPS": rng.choice([1, 6, 13, 36, 48], n),
         "PEMLR": rng.integers(1, 8, n),
+        "PRNMCHLD": rng.integers(0, 3, n),
+        "GTMETSTA": rng.integers(1, 4, n),
+        "PEAFEVER": rng.integers(1, 3, n),
+        "PRCITSHP": rng.integers(1, 6, n),
     })
     for col in main.BINARY_FEATURES:
         df[col] = rng.integers(0, 2, n)
@@ -97,6 +101,27 @@ class TestFeatureDefinitions(unittest.TestCase):
 
     def test_reduced_set_is_education_income_age_disability(self):
         self.assertEqual(set(main.REDUCED_FEATURES), {"PRTAGE", "HEFAMINC", "PEEDUCA"} | set(main.BINARY_FEATURES))
+
+    def test_extended_set_adds_five_household_and_geography_inputs(self):
+        self.assertEqual(main.EXTENDED_FEATURES[:15], main.FEATURES)
+        self.assertEqual(set(main.EXTENDED_FEATURES) - set(main.FEATURES),
+                         {"HRNUMHOU", "PRNMCHLD", "GTMETSTA", "PEAFEVER", "PRCITSHP"})
+        self.assertFalse(set(main.EXTENDED_FEATURES) & main.INTERNET_COLUMNS)
+        for col in main.EXTENDED_FEATURES:
+            self.assertIn(col, main.FEATURE_GROUPS)
+
+    def test_load_predictor_table_requires_extended_columns_for_run_d(self):
+        with tempfile.TemporaryDirectory() as tmp:
+            cwd = os.getcwd()
+            os.chdir(tmp)
+            try:
+                os.makedirs("data")
+                make_df(50).drop(columns=["GTMETSTA"]).to_csv(main.PREDICTOR_FILE, index=False)
+                self.assertIsNotNone(main.load_predictor_table())  # the protocol inputs are all present
+                with self.assertRaises(ValueError):
+                    main.load_predictor_table(main.EXTENDED_FEATURES)
+            finally:
+                os.chdir(cwd)
 
     def test_load_predictor_table_rejects_leaked_columns(self):
         with tempfile.TemporaryDirectory() as tmp:
@@ -231,6 +256,22 @@ class TestMainEntry(unittest.TestCase):
         self.assertEqual(set(summary), {"A_pooled", "B_temporal"})
         self.assertTrue(os.path.exists("outputs/A_pooled/model_comparison.csv"))
         self.assertTrue(os.path.exists("outputs/B_temporal/model_comparison.csv"))
+
+    def test_extended_run_d_uses_extra_inputs_on_the_same_test_records_as_a(self):
+        make_df().to_csv(main.PREDICTOR_FILE, index=False)
+        with mock.patch("builtins.print"), mock.patch.object(main.dataPrep, "main"):
+            main.main(experiment="A", cv=2, quick=True, outdir="outputs", verbose=False)
+            summary = main.main(experiment="D", cv=2, quick=True, outdir="outputs", verbose=False)
+        self.assertEqual(set(summary), {"D_extended"})
+        with open("outputs/D_extended/run_manifest.json") as f:
+            manifest = json.load(f)
+        self.assertEqual(manifest["features"], main.EXTENDED_FEATURES)
+        self.assertFalse(manifest["protocol_experiment"])
+        a_ids = pd.read_csv("outputs/A_pooled/test_predictions.csv")[main.ID_COLUMNS]
+        d_ids = pd.read_csv("outputs/D_extended/test_predictions.csv")[main.ID_COLUMNS]
+        pd.testing.assert_frame_equal(a_ids, d_ids)
+        coefs = pd.read_csv("outputs/D_extended/logistic_coefficients.csv")
+        self.assertTrue({"HRNUMHOU", "PRNMCHLD", "GTMETSTA", "PEAFEVER", "PRCITSHP"} <= set(coefs["input"]))
 
     def test_stops_when_no_data_available(self):
         with mock.patch("builtins.print"), mock.patch.object(main.dataPrep, "main", return_value=None) as prep:

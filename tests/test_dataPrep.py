@@ -36,6 +36,7 @@ def make_row(**overrides):
         "PEDISEAR": 2, "PEDISEYE": 2, "PEDISREM": 2, "PEDISPHY": 1, "PEDISDRS": 2, "PEDISOUT": 2,
         "PESEX": 1, "PTDTRACE": 1, "PEMARITL": 1, "HEFAMINC": 5, "PEEDUCA": 39, "HETENURE": 1,
         "GESTFIPS": 1, "PEMLR": 5, "HXFAMINC": 0,
+        "PRNMCHLD": 0, "GTMETSTA": 1, "PEAFEVER": 2, "PRCITSHP": 1,
         "HEINHOME": 1, "PEINHOME": 1, "PEINWORK": -1, "PEINSCHL": 2, "PEINCAFE": 2, "PEINTRAV": 2,
         "PEINLICO": 2, "PEINELHO": 2, "PEINOTHR": 2, "HENETCHK": -1, "PENETCK2": -1, "HEEVRHOM": -1,
     }
@@ -207,8 +208,8 @@ class TestFeatureSelection(TempDirTestCase):
         df = dataPrep.build_outcome(pd.DataFrame([make_row(), nonuser(PULINENO=2)]))
         result = dataPrep.feature_selection(df)
 
-        expected = set(dataPrep.METADATA_COLUMNS + dataPrep.PREDICTOR_COLUMNS + dataPrep.DISABILITY_INDICATORS
-                       + ["DISTYPE", "DIGITAL_EXCLUSION"])
+        expected = set(dataPrep.METADATA_COLUMNS + dataPrep.PREDICTOR_COLUMNS + dataPrep.EXTENDED_PREDICTOR_COLUMNS
+                       + dataPrep.DISABILITY_INDICATORS + ["DISTYPE", "DIGITAL_EXCLUSION"])
         self.assertEqual(set(result.columns), expected)
         for col in dataPrep.OUTCOME_SOURCE_COLUMNS + ["INTERNET_USER", "OUTCOME_STATUS", "PRDISFLG"] + dataPrep.DISABILITY_FLAGS:
             self.assertNotIn(col, result.columns)

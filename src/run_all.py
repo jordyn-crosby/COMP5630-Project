@@ -7,7 +7,8 @@
 #   3. main.py               Experiment B (temporal) then Experiment A (pooled)
 #   4. h3_feature_reduction  full vs reduced inputs, prespecified tolerances
 #   5. main.py --experiment C  sensitivity run, unweighted and tuned on accuracy (skip with --skip-sensitivity)
-#   6. plot_results.py       results/: model_performance.csv + the two figures
+#   6. main.py --experiment D  sensitivity run, five extra household/geography predictors (same flag)
+#   7. plot_results.py       results/: model_performance.csv + the two figures
 #
 # Works in both layouts: scripts in src/ with tests/ beside it (the GitHub repo), or everything in one folder
 # (the Revised_code working copy). All paths are relative to the project root, which is the parent of src/
@@ -82,6 +83,8 @@ def steps(raw_dir, quick, skip_tests, skip_sensitivity):
     if not skip_sensitivity:
         plan.append(("Sensitivity run C (unweighted, accuracy-tuned)",
                      [py, script("main.py"), "--experiment", "C"] + quick_flags))
+        plan.append(("Sensitivity run D (five extra household/geography predictors)",
+                     [py, script("main.py"), "--experiment", "D"] + quick_flags))
     plan.append(("Figures and combined table", [py, script("plot_results.py")]))
     return plan
 
