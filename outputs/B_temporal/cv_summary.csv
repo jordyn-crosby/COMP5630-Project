@@ -1,0 +1,5 @@
+Model,Best Params,CV f1_macro mean,CV f1_macro std,CV train f1_macro mean,Candidates,Fit seconds
+Logistic Regression,"{""model__C"": 0.01}",0.6786,0.0075,0.6806,4,3.4
+Decision Tree,"{""model__max_depth"": 5, ""model__min_samples_leaf"": 1}",0.6643,0.0059,0.6795,12,4.1
+Random Forest,"{""model__max_depth"": 10, ""model__min_samples_leaf"": 1}",0.6783,0.0059,0.7406,9,80.3
+XGBoost,"{""model__learning_rate"": 0.1, ""model__max_depth"": 3, ""model__n_estimators"": 300}",0.68,0.005,0.7152,8,13.9

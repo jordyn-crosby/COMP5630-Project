@@ -1,0 +1,69 @@
+H3 prespecified tolerances: accuracy drop <= 3.0 points AND exclusion recall drop <= 5.0 points
+Reduced inputs: ['PRTAGE', 'HEFAMINC', 'PEEDUCA', 'DIS_HEARING', 'DIS_VISION', 'DIS_COGNITIVE', 'DIS_MOBILITY', 'DIS_SELFCARE', 'DIS_INDLIVING']
+
+===== Experiment H3_pooled_full: pooled protocol, all ten predictor groups =====
+  train/dev: {'n': 13133, 'excluded': 5045, 'exclusion_rate': 0.3841, 'households': 11815, 'years': {2019: 4664, 2021: 4095, 2023: 4374}}
+  test:      {'n': 5629, 'excluded': 2163, 'exclusion_rate': 0.3843, 'households': 5060, 'years': {2019: 1946, 2021: 1789, 2023: 1894}}
+  Logistic Regression: best {'model__C': 0.01}  CV f1_macro=0.669  (3.5s)
+  Decision Tree: best {'model__max_depth': 3, 'model__min_samples_leaf': 1}  CV f1_macro=0.662  (3.9s)
+  Random Forest: best {'model__max_depth': None, 'model__min_samples_leaf': 5}  CV f1_macro=0.670  (85.6s)
+  XGBoost: best {'model__learning_rate': 0.1, 'model__max_depth': 3, 'model__n_estimators': 100}  CV f1_macro=0.671  (13.0s)
+  Model training complete
+  Model testing complete
+
+  Model comparison on held-out records:
+    Dummy (majority)     Acc=0.616  BalAcc=0.500  Prec=0.000  Rec=0.000  F1=0.000  MacroF1=0.381  AUC=0.500
+    Logistic Regression  Acc=0.684  BalAcc=0.682  Prec=0.576  Rec=0.673  F1=0.621  MacroF1=0.675  AUC=0.737
+    Decision Tree        Acc=0.671  BalAcc=0.658  Prec=0.568  Rec=0.602  F1=0.584  MacroF1=0.656  AUC=0.694
+    Random Forest        Acc=0.684  BalAcc=0.685  Prec=0.575  Rec=0.686  F1=0.626  MacroF1=0.676  AUC=0.739
+    XGBoost              Acc=0.682  BalAcc=0.681  Prec=0.572  Rec=0.680  F1=0.622  MacroF1=0.674  AUC=0.739
+
+  Hypotheses:
+Hypothesis               Model                  Metric                                            Value                                  Target   Met
+        H1 Logistic Regression            Accuracy (%)                                            68.38                                    78.3 False
+        H1       Decision Tree            Accuracy (%)                                             67.1                                    80.7 False
+        H1       Random Forest            Accuracy (%)                                            68.43                                    80.0 False
+        H1             XGBoost            Accuracy (%)                                            68.18                                    79.0 False
+        H1           any model at least one target met                                            False                                    True False
+        H2 RF & XGB vs LR & DT                Accuracy ensembles 0.6818-0.6843 vs singles 0.6710-0.6838 both ensembles above both single models False
+        H2 RF & XGB vs LR & DT                Macro F1 ensembles 0.6736-0.6763 vs singles 0.6561-0.6748 both ensembles above both single models False
+        H2 RF & XGB vs LR & DT                 ROC AUC ensembles 0.7385-0.7391 vs singles 0.6940-0.7370 both ensembles above both single models  True
+  Saved results to outputs/H3_pooled/full/
+
+===== Experiment H3_pooled_reduced: pooled protocol, reduced set: age, income, education, disability type =====
+  train/dev: {'n': 13133, 'excluded': 5045, 'exclusion_rate': 0.3841, 'households': 11815, 'years': {2019: 4664, 2021: 4095, 2023: 4374}}
+  test:      {'n': 5629, 'excluded': 2163, 'exclusion_rate': 0.3843, 'households': 5060, 'years': {2019: 1946, 2021: 1789, 2023: 1894}}
+  Logistic Regression: best {'model__C': 0.1}  CV f1_macro=0.665  (0.5s)
+  Decision Tree: best {'model__max_depth': 3, 'model__min_samples_leaf': 1}  CV f1_macro=0.662  (1.3s)
+  Random Forest: best {'model__max_depth': 5, 'model__min_samples_leaf': 20}  CV f1_macro=0.669  (66.0s)
+  XGBoost: best {'model__learning_rate': 0.05, 'model__max_depth': 3, 'model__n_estimators': 100}  CV f1_macro=0.669  (5.1s)
+  Model training complete
+  Model testing complete
+
+  Model comparison on held-out records:
+    Dummy (majority)     Acc=0.616  BalAcc=0.500  Prec=0.000  Rec=0.000  F1=0.000  MacroF1=0.381  AUC=0.500
+    Logistic Regression  Acc=0.677  BalAcc=0.673  Prec=0.570  Rec=0.653  F1=0.609  MacroF1=0.667  AUC=0.730
+    Decision Tree        Acc=0.671  BalAcc=0.658  Prec=0.568  Rec=0.602  F1=0.584  MacroF1=0.656  AUC=0.694
+    Random Forest        Acc=0.668  BalAcc=0.669  Prec=0.556  Rec=0.672  F1=0.609  MacroF1=0.660  AUC=0.728
+    XGBoost              Acc=0.675  BalAcc=0.675  Prec=0.564  Rec=0.675  F1=0.615  MacroF1=0.666  AUC=0.732
+
+  Hypotheses:
+Hypothesis               Model                  Metric                                            Value                                  Target   Met
+        H1 Logistic Regression            Accuracy (%)                                            67.72                                    78.3 False
+        H1       Decision Tree            Accuracy (%)                                             67.1                                    80.7 False
+        H1       Random Forest            Accuracy (%)                                            66.81                                    80.0 False
+        H1             XGBoost            Accuracy (%)                                            67.45                                    79.0 False
+        H1           any model at least one target met                                            False                                    True False
+        H2 RF & XGB vs LR & DT                Accuracy ensembles 0.6681-0.6745 vs singles 0.6710-0.6772 both ensembles above both single models False
+        H2 RF & XGB vs LR & DT                Macro F1 ensembles 0.6603-0.6665 vs singles 0.6561-0.6670 both ensembles above both single models False
+        H2 RF & XGB vs LR & DT                 ROC AUC ensembles 0.7279-0.7318 vs singles 0.6940-0.7298 both ensembles above both single models False
+  Saved results to outputs/H3_pooled/reduced/
+
+===== H3: full vs reduced (held-out) =====
+              Model  Full accuracy (%)  Reduced accuracy (%)  Accuracy drop (points)  Full recall excluded (%)  Reduced recall excluded (%)  Recall drop (points)  F1 excluded drop (points)  ROC AUC drop (points)  Within accuracy tolerance  Within recall tolerance  H3 holds for this model
+Logistic Regression              68.38                 67.72                    0.66                     67.31                        65.33                  1.99                       1.20                   0.72                       True                     True                     True
+      Decision Tree              67.10                 67.10                    0.00                     60.19                        60.19                  0.00                       0.00                   0.00                       True                     True                     True
+      Random Forest              68.43                 66.81                    1.62                     68.61                        67.22                  1.39                       1.66                   1.12                       True                     True                     True
+            XGBoost              68.18                 67.45                    0.73                     68.01                        67.55                  0.46                       0.70                   0.67                       True                     True                     True
+
+Saved outputs/H3_pooled/h3_comparison.csv

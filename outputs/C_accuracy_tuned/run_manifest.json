@@ -1,0 +1,146 @@
+{
+  "experiment": "C_accuracy_tuned",
+  "description": "sensitivity: same pooled household-grouped split as A, unweighted classes, tuned on accuracy",
+  "protocol_experiment": false,
+  "timestamp_utc": "2026-11-15T21:21:13.108915+00:00",
+  "python": "3.13.18",
+  "platform": "Linux-6.18.44-fc-v470-x86_64-with-glibc2.39",
+  "pandas": "3.0.5",
+  "numpy": "2.5.3",
+  "scikit-learn": "1.9.1",
+  "xgboost": "3.4.1",
+  "seed": 42,
+  "scoring": "accuracy",
+  "class_weighting": false,
+  "cv_folds": 5,
+  "quick_grids": false,
+  "target": "DIGITAL_EXCLUSION",
+  "features": [
+    "PRTAGE",
+    "HEFAMINC",
+    "PEEDUCA",
+    "PESEX",
+    "PTDTRACE",
+    "PEMARITL",
+    "HETENURE",
+    "GESTFIPS",
+    "PEMLR",
+    "DIS_HEARING",
+    "DIS_VISION",
+    "DIS_COGNITIVE",
+    "DIS_MOBILITY",
+    "DIS_SELFCARE",
+    "DIS_INDLIVING"
+  ],
+  "feature_groups": [
+    "Age",
+    "Disability type",
+    "Education",
+    "Employment status",
+    "Family income",
+    "Housing tenure",
+    "Marital status",
+    "Race",
+    "Sex",
+    "State"
+  ],
+  "internet_fields_in_inputs": [],
+  "frozen_before_test_evaluation": [
+    "model families",
+    "hyperparameter grids",
+    "outcome rule",
+    "scoring rule",
+    "cohort rule",
+    "split procedure"
+  ],
+  "train": {
+    "n": 13133,
+    "excluded": 5045,
+    "exclusion_rate": 0.3841,
+    "households": 11815,
+    "years": {
+      "2019": 4664,
+      "2021": 4095,
+      "2023": 4374
+    }
+  },
+  "test": {
+    "n": 5629,
+    "excluded": 2163,
+    "exclusion_rate": 0.3843,
+    "households": 5060,
+    "years": {
+      "2019": 1946,
+      "2021": 1789,
+      "2023": 1894
+    }
+  },
+  "realized_test_fraction": 0.3,
+  "grids": {
+    "Logistic Regression": {
+      "model__C": [
+        0.01,
+        0.1,
+        1,
+        10
+      ]
+    },
+    "Decision Tree": {
+      "model__max_depth": [
+        3,
+        5,
+        8,
+        12
+      ],
+      "model__min_samples_leaf": [
+        1,
+        20,
+        50
+      ]
+    },
+    "Random Forest": {
+      "model__max_depth": [
+        5,
+        10,
+        null
+      ],
+      "model__min_samples_leaf": [
+        1,
+        5,
+        20
+      ]
+    },
+    "XGBoost": {
+      "model__max_depth": [
+        3,
+        5
+      ],
+      "model__learning_rate": [
+        0.05,
+        0.1
+      ],
+      "model__n_estimators": [
+        100,
+        300
+      ]
+    }
+  },
+  "best_params": {
+    "Logistic Regression": {
+      "model__C": 0.01
+    },
+    "Decision Tree": {
+      "model__max_depth": 5,
+      "model__min_samples_leaf": 50
+    },
+    "Random Forest": {
+      "model__max_depth": null,
+      "model__min_samples_leaf": 5
+    },
+    "XGBoost": {
+      "model__learning_rate": 0.1,
+      "model__max_depth": 3,
+      "model__n_estimators": 100
+    }
+  }
+}

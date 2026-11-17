@@ -1,12 +1,16 @@
-# census data files are too big for GitHub (>100 MB each)
-*.csv
+# raw census files (195 MB each) are extracted from data/data.zip by run_all.py; the large derived audit table
+# is rebuilt by dataPrep.py. The small modeling table and cohort summary are committed so main.py runs at once.
+# data/data.zip (44 MB) stays tracked on purpose: it is what lets a fresh clone run from raw data.
 data/*.csv
+!data/predictor_data.csv
+!data/cohort_summary.csv
+__MACOSX/
+
+# the results table and figures go with the paper
+!results/*.csv
 
 # local environment / OS / Python cache files
 .venv/
 .idea/
 .DS_Store
 __pycache__/
-
-# small model performance table written by main.py (kept so it can go with the paper)
-!results/*.csv
